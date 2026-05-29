@@ -1,4 +1,4 @@
-const { open } = window.__TAURI__.dialog;
+const { open, ask } = window.__TAURI__.dialog;
 const { Command } = window.__TAURI__.shell;
 
 // DOM Elements
@@ -56,6 +56,7 @@ function setupNavigation() {
   navLibrary.addEventListener('click', () => {
     setActiveNav(navLibrary);
     viewTitle.textContent = "All Songs";
+    trackListContainer.removeAttribute('data-active-playlist-id'); // Clear out active playlist reference
     displayedTracks = [...allTracks];
     renderTracklist(displayedTracks);
   });
@@ -126,7 +127,12 @@ async function executePlaylistCommand(argssss) {
 // Inject customized playlist items directly into the Sidebar menu node
 function renderPlaylistSidebar() {
   playlistNavList.innerHTML = '';
+  
   playlists.forEach(pl => {
+    // Create a container wrapper for the playlist button and its trash icon
+    const container = document.createElement('div');
+    container.className = 'playlist-sidebar-row';
+    
     const btn = document.createElement('button');
     btn.className = 'menu-item';
     btn.textContent = `📜 ${pl.name}`;
@@ -134,10 +140,38 @@ function renderPlaylistSidebar() {
     btn.addEventListener('click', () => {
       setActiveNav(btn);
       viewTitle.textContent = pl.name;
-      displayedTracks = [...pl.tracks]; // Swap queue mapping exclusively to selected playlist tracks
+      // Store the active playlist ID context globally on the HTML node for removal reference!
+      trackListContainer.setAttribute('data-active-playlist-id', pl.id);
+      displayedTracks = [...pl.tracks];
       renderTracklist(displayedTracks);
     });
-    playlistNavList.appendChild(btn);
+
+    const trashBtn = document.createElement('button');
+    trashBtn.className = 'btn-trash';
+    trashBtn.innerHTML = '🗑️';
+    trashBtn.title = `Delete ${pl.name}`;
+    
+    trashBtn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // Stop sidebar navigation from firing
+      
+      // Fire Tauri's premium native OS dialogue box
+      const confirmation = await ask(
+        `Are you sure you want to permanently delete "${pl.name}"?`, 
+        { title: 'Good Vibes Amp', type: 'warning' }
+      );
+      
+      // 'confirmation' will return true ONLY if the user clicks "Yes/OK"
+      if (confirmation) {
+        if (viewTitle.textContent === pl.name) {
+          navLibrary.click();
+        }
+        executePlaylistCommand(['delete_playlist', String(pl.id)]);
+      }
+    });
+
+    container.appendChild(btn);
+    container.appendChild(trashBtn);
+    playlistNavList.appendChild(container);
   });
 }
 
@@ -173,6 +207,11 @@ function renderTracklist(tracks) {
     return;
   }
 
+  // Determine if we are looking at a playlist view by checking sidebar active states
+  const activePlaylistBtn = playlistNavList.querySelector('.menu-item.active');
+  const isPlaylistView = activePlaylistBtn !== null;
+  const activePlaylistId = trackListContainer.getAttribute('data-active-playlist-id');
+
   tracks.forEach((track, index) => {
     const row = document.createElement('div');
     row.className = 'track-row';
@@ -181,11 +220,15 @@ function renderTracklist(tracks) {
       row.style.borderLeft = '3px solid var(--accent)';
     }
     
-    // Create dropdown selection block options for adding track context to playlists
     let playlistOptions = `<option value="" disabled selected>➕ Add to...</option>`;
     playlists.forEach(pl => {
       playlistOptions += `<option value="${pl.id}">${pl.name}</option>`;
     });
+
+    // Contextual Action Button item: Show dropdown selector if in Library view, or Trash can if inside custom Playlist view!
+    const actionCell = isPlaylistView 
+      ? `<button class="btn-trash row-remove-btn" title="Remove from playlist">🗑️</button>`
+      : `<div><select class="playlist-selector">${playlistOptions}</select></div>`;
 
     row.innerHTML = `
       <span class="track-number">${index + 1}</span>
@@ -194,28 +237,33 @@ function renderTracklist(tracks) {
         <span class="track-artist">${track.artist}</span>
       </div>
       <span class="track-album">${track.album}</span>
-      <div>
-        <select class="playlist-selector" data-trackid="${track.id}">
-          ${playlistOptions}
-        </select>
-      </div>
+      ${isPlaylistView ? '<div></div>' + actionCell : actionCell + '<div></div>'}
     `;
 
-    // Click track entry parameters (ignore if user clicked dropdown selection box)
+    // Row Click Interceptor 
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('playlist-selector')) return;
+      if (e.target.classList.contains('playlist-selector') || e.target.classList.contains('row-remove-btn')) return;
       currentTrackIndex = index;
       playTrack(track);
       renderTracklist(displayedTracks);
     });
 
-    // Dropdown change trigger listener
-    const selector = row.querySelector('.playlist-selector');
-    selector.addEventListener('change', (e) => {
-      const playlistId = String(e.target.value); // Ensure string conversion
-      const trackId = String(track.id);          // Convert integer ID to string
-      executePlaylistCommand(['add_to_playlist', playlistId, trackId]);
-    });
+    // If it's a library view, attach dropdown event listener
+    if (!isPlaylistView) {
+      const selector = row.querySelector('.playlist-selector');
+      selector.addEventListener('change', (e) => {
+        executePlaylistCommand(['add_to_playlist', String(e.target.value), String(track.id)]);
+      });
+    } else {
+      // If it's a playlist view, attach track entry removal event listener
+      const removeBtn = row.querySelector('.row-remove-btn');
+      removeBtn.addEventListener('click', () => {
+        executePlaylistCommand(['remove_from_playlist', String(activePlaylistId), String(track.id)]);
+        // Instantly force state sync updates to screen array map
+        displayedTracks = displayedTracks.filter(t => t.id !== track.id);
+        renderTracklist(displayedTracks);
+      });
+    }
 
     trackListContainer.appendChild(row);
   });

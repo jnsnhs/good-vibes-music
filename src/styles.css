@@ -8,7 +8,9 @@
   --accent-hover: #c084fc;
   --text-main: #f4f4f5;
   --text-muted: #a1a1aa;
-  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-stack:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
 }
 
 * {
@@ -74,7 +76,8 @@ body {
   transition: all 0.2s ease;
 }
 
-.menu-item:hover, .menu-item.active {
+.menu-item:hover,
+.menu-item.active {
   color: var(--text-main);
   background-color: var(--bg-hover);
 }
@@ -229,8 +232,9 @@ body {
   width: 32px;
 }
 
-.progress-bar, .volume-slider {
-  flex-index: 1;
+.progress-bar,
+.volume-slider {
+  flex-basis: 1;
   width: 100%;
   accent-color: var(--accent);
   cursor: pointer;
@@ -336,4 +340,46 @@ body {
   opacity: 1;
   color: var(--accent) !important;
   text-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+}
+
+/* Sidebar Playlist Row Layout with Trash Icon */
+.playlist-sidebar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-right: 4px;
+}
+
+.playlist-sidebar-row .menu-item {
+  flex-grow: 1;
+}
+
+/* Action Delete buttons */
+.btn-trash {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: all 0.2s ease;
+  padding: 6px;
+}
+
+/* Reveal trash can elements fluidly upon hovering over parent items */
+.playlist-sidebar-row:hover .btn-trash,
+.track-row:hover .btn-trash {
+  opacity: 0.6;
+}
+
+.btn-trash:hover {
+  opacity: 1 !important;
+  color: #ef4444 !important; /* Premium crimson warning tint */
+  transform: scale(1.1);
+}
+
+/* Update track-row layout architecture grid to make space for the action icon */
+.track-row {
+  grid-template-columns: 40px 2fr 1fr 120px 40px;
 }

@@ -175,6 +175,29 @@ def get_playlists_data():
     conn.close()
     return json.dumps(playlists)
 
+def delete_playlist(playlist_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        # SQLite foreign key with ON DELETE CASCADE will handle cleaning up playlist_tracks automatically!
+        cursor.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
+        conn.commit()
+    except Exception as e:
+        print(f"Error deleting playlist: {e}", file=sys.stderr)
+    conn.close()
+    return get_playlists_data()
+
+def remove_from_playlist(playlist_id, track_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?", (playlist_id, track_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Error removing track from playlist: {e}", file=sys.stderr)
+    conn.close()
+    return get_playlists_data()
+
 # --- UPDATE YOUR MAIN ROUTER BLOCK ---
 if __name__ == "__main__":
     init_db()
@@ -190,5 +213,10 @@ if __name__ == "__main__":
             print(add_to_playlist(sys.argv[2], sys.argv[3]))
         elif command == "get_playlists":
             print(get_playlists_data())
+        # NEW UTILITY COMMAND ROUTERS
+        elif command == "delete_playlist" and len(sys.argv) > 2:
+            print(delete_playlist(sys.argv[2]))
+        elif command == "remove_from_playlist" and len(sys.argv) > 3:
+            print(remove_from_playlist(sys.argv[2], sys.argv[3]))
     else:
         print(json.dumps({"error": "No command provided"}))
