@@ -1,9 +1,9 @@
 /* Core Variables for a Sleek Dark Theme */
 :root {
-  --bg-darker: #09090b;
-  --bg-dark: #121214;
-  --bg-card: #1a1a1e;
-  --bg-hover: #27272a;
+  --bg-darker: #1e1e1e;
+  --bg-dark: #262626;
+  --bg-card: #1e1e1e;
+  --bg-hover: #343434;
   --accent: #a855f7; /* Vibrant Purple Accent */
   --accent-hover: #c084fc;
   --text-main: #f4f4f5;
@@ -318,4 +318,22 @@ body {
 .playlist-selector:hover {
   color: var(--text-main);
   border-color: var(--accent);
+}
+
+/* Shuffle / Repeat Styling */
+.secondary-ctrl {
+  font-size: 0.95rem !important;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.secondary-ctrl:hover {
+  opacity: 1;
+}
+
+/* When a mode is active, make it pop! */
+.secondary-ctrl.active {
+  opacity: 1;
+  color: var(--accent) !important;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
 }

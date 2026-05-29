@@ -27,6 +27,14 @@ const progressSlider = document.getElementById('progress-slider');
 const timeCurrent = document.getElementById('time-current');
 const timeTotal = document.getElementById('time-total');
 const volumeSlider = document.getElementById('volume-slider');
+const btnShuffle = document.getElementById('btn-shuffle');
+const btnRepeat = document.getElementById('btn-repeat');
+
+// --- NEW STATE ENGINE REGISTERS ---
+let isShuffleOn = false;
+let repeatMode = 'off'; // Options: 'off', 'one', 'all'
+let shuffledIndices = []; // Maps randomized track numbers
+let shufflePointer = 0;   // Where we are inside the shuffled deck
 
 // --- RUNTIME STATE ---
 let allTracks = [];             
@@ -216,9 +224,13 @@ function renderTracklist(tracks) {
 // Native Playback Controller
 function playTrack(track) {
   if (!track) return;
+
+  // Stop existing playback and clean up
   if (currentAudio) {
     currentAudio.pause();
-    clearInterval(updateInterval);
+    // Remove old event listeners so they don't stack up in memory
+    currentAudio.ontimeupdate = null;
+    currentAudio.onended = null;
   }
 
   const assetUrl = window.__TAURI__.core.convertFileSrc(track.path);
@@ -226,6 +238,7 @@ function playTrack(track) {
   currentAudio.volume = volumeSlider.value / 100;
   currentAudio.play();
 
+  // Update UI metadata cards
   playerTitle.textContent = track.name;
   playerArtist.textContent = track.artist;
   isPlaying = true;
@@ -237,34 +250,77 @@ function playTrack(track) {
     playerCover.innerHTML = '⚡';
   }
 
+  // 1. Fire when track metadata loads (Sets up lengths)
   currentAudio.addEventListener('loadedmetadata', () => {
     progressSlider.max = Math.floor(currentAudio.duration);
     timeTotal.textContent = formatTime(currentAudio.duration);
   });
 
-  updateInterval = setInterval(() => {
+  // 2. NATIVE PROGRESS LOOP: Moves the slider perfectly synchronized with the hardware
+  currentAudio.addEventListener('timeupdate', () => {
     if (!currentAudio) return;
     progressSlider.value = Math.floor(currentAudio.currentTime);
     timeCurrent.textContent = formatTime(currentAudio.currentTime);
+  });
 
-    if (currentAudio.ended) {
+  // 3. NATIVE END-OF-TRACK INTERCEPT: Clean, decoupled playback routing
+  currentAudio.addEventListener('ended', () => {
+    if (repeatMode === 'one') {
+      currentAudio.currentTime = 0;
+      currentAudio.play();
+    } else {
       handleNextTrack();
     }
-  }, 250);
+  });
 }
 
 function handleNextTrack() {
   if (displayedTracks.length === 0) return;
-  currentTrackIndex++;
-  if (currentTrackIndex >= displayedTracks.length) currentTrackIndex = 0;
+
+  if (isShuffleOn) {
+    shufflePointer++;
+    if (shufflePointer >= shuffledIndices.length) {
+      if (repeatMode === 'all') {
+        shufflePointer = 0; // Wrap deck around
+      } else {
+        // End of deck, stop playback
+        if (currentAudio) currentAudio.pause();
+        isPlaying = false;
+        btnPlay.textContent = '▶';
+        return;
+      }
+    }
+    currentTrackIndex = shuffledIndices[shufflePointer];
+  } else {
+    currentTrackIndex++;
+    if (currentTrackIndex >= displayedTracks.length) {
+      if (repeatMode === 'all') {
+        currentTrackIndex = 0; // Wrap linear queue around
+      } else {
+        if (currentAudio) currentAudio.pause();
+        isPlaying = false;
+        btnPlay.textContent = '▶';
+        return;
+      }
+    }
+  }
+
   playTrack(displayedTracks[currentTrackIndex]);
   renderTracklist(displayedTracks);
 }
 
 function handlePrevTrack() {
   if (displayedTracks.length === 0) return;
-  currentTrackIndex--;
-  if (currentTrackIndex < 0) currentTrackIndex = displayedTracks.length - 1;
+
+  if (isShuffleOn) {
+    shufflePointer--;
+    if (shufflePointer < 0) shufflePointer = shuffledIndices.length - 1;
+    currentTrackIndex = shuffledIndices[shufflePointer];
+  } else {
+    currentTrackIndex--;
+    if (currentTrackIndex < 0) currentTrackIndex = displayedTracks.length - 1;
+  }
+
   playTrack(displayedTracks[currentTrackIndex]);
   renderTracklist(displayedTracks);
 }
@@ -286,6 +342,30 @@ btnPlay.addEventListener('click', () => {
   else { currentAudio.play(); btnPlay.textContent = '⏸'; }
   isPlaying = !isPlaying;
 });
+btnShuffle.addEventListener('click', () => {
+  isShuffleOn = !isShuffleOn;
+  btnShuffle.classList.toggle('active', isShuffleOn);
+  
+  if (isShuffleOn && displayedTracks.length > 0) {
+    generateShuffleDeck();
+  }
+});
+btnRepeat.addEventListener('click', () => {
+  if (repeatMode === 'off') {
+    repeatMode = 'one';
+    btnRepeat.textContent = '🔂'; // Single track icon
+    btnRepeat.classList.add('active');
+  } else if (repeatMode === 'one') {
+    repeatMode = 'all';
+    btnRepeat.textContent = '🔁'; // Full list icon
+    btnRepeat.classList.add('active');
+  } else {
+    repeatMode = 'off';
+    btnRepeat.textContent = '🔁';
+    btnRepeat.classList.remove('active');
+  }
+});
+
 progressSlider.addEventListener('input', () => {
   if (!currentAudio) return;
   currentAudio.currentTime = progressSlider.value;
@@ -310,4 +390,24 @@ function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+// Helper to generate a randomized deck of indices
+function generateShuffleDeck() {
+  // Create an array [0, 1, 2, ..., tracks.length - 1]
+  shuffledIndices = Array.from({ length: displayedTracks.length }, (_, i) => i);
+  
+  // Fisher-Yates Shuffle Algorithm to randomize the deck cleanly
+  for (let i = shuffledIndices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+  }
+  
+  // Set our pointer to match whatever song is currently playing, if any
+  const currentActiveMatch = shuffledIndices.indexOf(currentTrackIndex);
+  if (currentActiveMatch !== -1) {
+    shufflePointer = currentActiveMatch;
+  } else {
+    shufflePointer = 0;
+  }
 }
