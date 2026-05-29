@@ -50,6 +50,7 @@ body {
   font-weight: 700;
   letter-spacing: -0.5px;
   background: linear-gradient(45deg, var(--accent), #3b82f6);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -247,4 +248,74 @@ body {
 
 .volume-slider {
   max-width: 100px;
+}
+
+/* Search Bar styling */
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.view-header h1 {
+  margin-bottom: 0; /* Align perfectly with search bar */
+}
+
+.search-container {
+  width: 300px;
+}
+
+#search-bar {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: var(--bg-card);
+  border: 1px solid #27272a;
+  border-radius: 20px; /* Rounded pill style */
+  color: var(--text-main);
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+#search-bar:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+
+.menu-heading {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding-left: 12px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+.add-playlist-btn {
+  border: 1px dashed #27272a !important;
+  text-align: center !important;
+  margin-top: 8px;
+}
+
+/* Playlist utility adjustments */
+.track-row {
+  grid-template-columns: 40px 2fr 1fr 120px; /* Expand columns to fit action element */
+}
+
+.playlist-selector {
+  background-color: var(--bg-card);
+  border: 1px solid #27272a;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  max-width: 110px;
+}
+
+.playlist-selector:hover {
+  color: var(--text-main);
+  border-color: var(--accent);
 }

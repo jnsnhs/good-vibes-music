@@ -1,79 +1,114 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Good Vibes Amp</title>
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body>
-  <div class="app-container">
-    
-    <aside class="sidebar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Good Vibes Amp</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <aside class="sidebar">
       <div class="logo">Good Vibes Amp</div>
+      
       <nav class="menu">
-        <button class="menu-item active" id="btn-library">🎵 My Library</button>
-        <button class="menu-item" id="btn-add-folder">➕ Add Folder</button>
+        <span class="menu-heading">Library</span>
+        <button class="menu-item active" id="nav-library">🎵 All Songs</button>
+        <button class="menu-item" id="nav-artists">🎙️ Artists</button>
+        <button class="menu-item" id="nav-albums">💿 Albums</button>
       </nav>
+
+      <nav class="menu">
+        <span class="menu-heading">Collections</span>
+        <div id="playlist-nav-list">
+          </div>
+        <button class="menu-item add-playlist-btn" id="btn-create-playlist">➕ Create Playlist</button>
+      </nav>
+      
+      <div style="margin-top: auto;">
+        <button class="menu-item" id="btn-add-folder">📂 Add Folder Path</button>
+      </div>
     </aside>
 
-    <main class="main-content">
-      <header class="view-header">
-        <h1 id="view-title">My Library</h1>
-      </header>
-      
-      <div class="track-list" id="track-list">
-        <div class="track-row" data-src="">
-          <span class="track-number">1</span>
-          <div class="track-info">
-            <span class="track-name">Vibe Check</span>
-            <span class="track-artist">The Coding Crew</span>
+      <main class="main-content">
+        <header class="view-header">
+          <h1 id="view-title">My Library</h1>
+          <div class="search-container">
+            <input
+              type="text"
+              id="search-bar"
+              placeholder="🔍 Search by title, artist, or album..."
+            />
           </div>
-          <span class="track-album">Single</span>
-        </div>
-        <div class="track-row" data-src="">
-          <span class="track-number">2</span>
-          <div class="track-info">
-            <span class="track-name">Lo-Fi Bug Fixing</span>
-            <span class="track-artist">Syntax Error</span>
+        </header>
+
+        <div class="track-list" id="track-list">
+          <div class="track-row" data-src="">
+            <span class="track-number">1</span>
+            <div class="track-info">
+              <span class="track-name">Vibe Check</span>
+              <span class="track-artist">The Coding Crew</span>
+            </div>
+            <span class="track-album">Single</span>
           </div>
-          <span class="track-album">Chill Compiler</span>
+          <div class="track-row" data-src="">
+            <span class="track-number">2</span>
+            <div class="track-info">
+              <span class="track-name">Lo-Fi Bug Fixing</span>
+              <span class="track-artist">Syntax Error</span>
+            </div>
+            <span class="track-album">Chill Compiler</span>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
 
-    <footer class="player-bar">
-      <div class="now-playing">
-        <div class="cover-art-container">
-          <div class="cover-art-placeholder" id="player-cover">⚡</div>
+      <footer class="player-bar">
+        <div class="now-playing">
+          <div class="cover-art-container">
+            <div class="cover-art-placeholder" id="player-cover">⚡</div>
+          </div>
+          <div class="player-track-info">
+            <div class="player-track-title" id="player-title">Not Playing</div>
+            <div class="player-track-artist" id="player-artist">
+              Select a song
+            </div>
+          </div>
         </div>
-        <div class="player-track-info">
-          <div class="player-track-title" id="player-title">Not Playing</div>
-          <div class="player-track-artist" id="player-artist">Select a song</div>
+
+        <div class="player-controls">
+          <div class="control-buttons">
+            <button class="ctrl-btn" id="btn-prev">⏮</button>
+            <button class="ctrl-btn play-btn" id="btn-play">▶</button>
+            <button class="ctrl-btn" id="btn-next">⏭</button>
+          </div>
+          <div class="progress-container">
+            <span class="time-stamp" id="time-current">0:00</span>
+            <input
+              type="range"
+              class="progress-bar"
+              id="progress-slider"
+              min="0"
+              max="100"
+              value="0"
+            />
+            <span class="time-stamp" id="time-total">0:00</span>
+          </div>
         </div>
-      </div>
 
-      <div class="player-controls">
-        <div class="control-buttons">
-          <button class="ctrl-btn" id="btn-prev">⏮</button>
-          <button class="ctrl-btn play-btn" id="btn-play">▶</button>
-          <button class="ctrl-btn" id="btn-next">⏭</button>
+        <div class="volume-controls">
+          <span class="volume-icon">🔊</span>
+          <input
+            type="range"
+            class="volume-slider"
+            id="volume-slider"
+            min="0"
+            max="100"
+            value="80"
+          />
         </div>
-        <div class="progress-container">
-          <span class="time-stamp" id="time-current">0:00</span>
-          <input type="range" class="progress-bar" id="progress-slider" min="0" max="100" value="0">
-          <span class="time-stamp" id="time-total">0:00</span>
-        </div>
-      </div>
+      </footer>
+    </div>
 
-      <div class="volume-controls">
-        <span class="volume-icon">🔊</span>
-        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="80">
-      </div>
-    </footer>
-
-  </div>
-
-  <script type="module" src="./main.js"></script>
-</body>
+    <script type="module" src="./main.js"></script>
+  </body>
 </html>
