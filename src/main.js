@@ -175,32 +175,86 @@ function renderPlaylistSidebar() {
   });
 }
 
+// Upgraded Grouped View Router to render text rows for Artists, and a Visual Grid for Albums!
 function renderGroupedView(property) {
   trackListContainer.innerHTML = '';
+  
+  // Extract unique group values
   const groups = [...new Set(allTracks.map(track => track[property]))].sort();
 
-  groups.forEach(groupName => {
-    const row = document.createElement('div');
-    row.className = 'track-row';
-    row.style.gridTemplateColumns = '1fr';
-    row.innerHTML = `
-      <div class="track-info">
-        <span class="track-name" style="font-size: 1.1rem;">${groupName}</span>
-        <span class="track-artist">${allTracks.filter(t => t[property] === groupName).length} tracks available</span>
-      </div>
-    `;
-    row.addEventListener('click', () => {
-      viewTitle.textContent = `${groupName}`;
-      displayedTracks = allTracks.filter(t => t[property] === groupName);
-      renderTracklist(displayedTracks);
+  if (groups.length === 0) {
+    trackListContainer.innerHTML = "<p style='padding:16px; color:var(--text-muted);'>No items found.</p>";
+    return;
+  }
+
+  // --- CONDITION 1: RENDER ALBUM VISUAL ART GRID ---
+  if (property === 'album') {
+    // Add our grid class to the container dynamically
+    trackListContainer.className = 'album-grid';
+
+    groups.forEach(albumName => {
+      // Find the first track in this album to use its cover art as the jacket!
+      const representativeTrack = allTracks.find(t => t.album === albumName);
+      const coverArtData = representativeTrack?.cover;
+      const artistName = representativeTrack?.artist || "Unknown Artist";
+
+      const card = document.createElement('div');
+      card.className = 'album-card';
+
+      // Set up the card HTML structure with fallback lightning emblem if no art exists
+      card.innerHTML = `
+        <div class="album-card-cover">
+          ${coverArtData ? `<img src="${coverArtData}" alt="Album Cover" />` : '⚡'}
+        </div>
+        <div class="album-card-title" title="${albumName}">${albumName}</div>
+        <div class="album-card-artist" title="${artistName}">${artistName}</div>
+      `;
+
+      // Clicking an album card opens its dedicated tracklist view!
+      card.addEventListener('click', () => {
+        // Reset container classes back to standard track layout list style
+        trackListContainer.className = '';
+        viewTitle.textContent = `${albumName}`;
+        displayedTracks = allTracks.filter(t => t.album === albumName);
+        renderTracklist(displayedTracks);
+      });
+
+      trackListContainer.appendChild(card);
     });
-    trackListContainer.appendChild(row);
-  });
+
+  // --- CONDITION 2: RENDER ARTIST LIST ROWS ---
+  } else {
+    // Reset wrapper classes back to linear track list styling layout
+    trackListContainer.className = '';
+
+    groups.forEach(groupName => {
+      const row = document.createElement('div');
+      row.className = 'track-row';
+      row.style.gridTemplateColumns = '1fr';
+      
+      row.innerHTML = `
+        <div class="track-info">
+          <span class="track-name" style="font-size: 1.1rem;">${groupName}</span>
+          <span class="track-artist">${allTracks.filter(t => t[property] === groupName).length} tracks available</span>
+        </div>
+      `;
+
+      row.addEventListener('click', () => {
+        viewTitle.textContent = `${groupName}`;
+        displayedTracks = allTracks.filter(t => t[property] === groupName);
+        renderTracklist(displayedTracks);
+      });
+
+      trackListContainer.appendChild(row);
+    });
+  }
 }
 
 // Dynamically generate tracks table overlay display
 function renderTracklist(tracks) {
-  trackListContainer.innerHTML = ''; 
+  trackListContainer.className = ''; // Reset container layout grid class configuration frame!
+  trackListContainer.innerHTML = '';
+  // ... rest of your code remains the same
 
   if (!tracks || tracks.length === 0) {
     trackListContainer.innerHTML = "<p style='padding: 16px; color: var(--text-muted);'>No tracks inside this collection.</p>";
