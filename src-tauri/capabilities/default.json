@@ -19,16 +19,6 @@
           "sidecar": true
         }
       ]
-    },
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        {
-          "name": "metadata_engine",
-          "sidecar": true,
-          "args": true
-        }
-      ]
     }
   ]
 }

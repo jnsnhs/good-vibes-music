@@ -30,12 +30,6 @@ const volumeSlider = document.getElementById('volume-slider');
 const btnShuffle = document.getElementById('btn-shuffle');
 const btnRepeat = document.getElementById('btn-repeat');
 
-// Grab new streaming progress elements
-const scanProgressContainer = document.getElementById('scan-progress-container');
-const scanStatusText = document.getElementById('scan-status-text');
-const scanPercentageText = document.getElementById('scan-percentage-text');
-const scanProgressFill = document.getElementById('scan-progress-fill');
-
 // --- NEW STATE ENGINE REGISTERS ---
 let isShuffleOn = false;
 let repeatMode = 'off'; // Options: 'off', 'one', 'all'
@@ -483,90 +477,16 @@ volumeSlider.addEventListener('input', () => {
   if (!currentAudio) return;
   currentAudio.volume = volumeSlider.value / 100;
 });
-
 btnAddFolder.addEventListener('click', async () => {
   try {
-    const selectedFolder = await open({
-      directory: true,
-      multiple: false,
-      title: 'Select Music Folder'
-    });
-
-    if (!selectedFolder) return;
-
-    // 1. Reveal our progress layout dashboard
-    scanProgressContainer.style.display = 'block';
-    scanStatusText.textContent = "Spawning engine subsystem...";
-    scanPercentageText.textContent = "0%";
-    scanProgressFill.style.width = "0%";
-
-    // 2. Initialize the sidecar instance configuration
-    const command = Command.sidecar('metadata_engine', ['scan', selectedFolder]);
-    
-    // Accumulate the final JSON output string safely across chunks
-    let finalJsonAccumulator = "";
-
-    // 3. ATTACH ALL LISTENERS FIRST (Crucial for Tauri v2!)
-    command.on('stdout', (line) => {
-      if (line.startsWith("STREAM_STATUS:")) {
-        scanStatusText.textContent = line.replace("STREAM_STATUS:", "").trim();
-      } 
-      else if (line.startsWith("STREAM_PROGRESS:")) {
-        const parts = line.replace("STREAM_PROGRESS:", "").split('|');
-        const percentage = parts[0].trim();
-        const currentFileName = parts[1] ? parts[1].replace("Processing:", "").trim() : "";
-
-        scanPercentageText.textContent = percentage;
-        scanProgressFill.style.width = percentage;
-        scanStatusText.textContent = `Scanning: ${currentFileName}`;
-      } 
-      else {
-        finalJsonAccumulator += line;
-      }
-    });
-
-    command.on('stderr', (line) => {
-      console.warn("Engine sidecar warning output:", line);
-    });
-
-    // MOVED UP: Register the 'close' event BEFORE spawning the process
-    command.on('close', (data) => {
-      console.log(`Scan engine finished safely with execution exit code ${data.code}`);
-      
-      scanPercentageText.textContent = "100%";
-      scanProgressFill.style.width = "100%";
-      scanStatusText.textContent = "Database synced completely!";
-
-      setTimeout(() => {
-        scanProgressContainer.style.display = 'none';
-      }, 2500);
-
-      try {
-        const jsonStart = finalJsonAccumulator.indexOf('[');
-        const jsonEnd = finalJsonAccumulator.lastIndexOf(']') + 1;
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          const cleanJson = finalJsonAccumulator.slice(jsonStart, jsonEnd);
-          allTracks = JSON.parse(cleanJson);
-          
-          if (document.getElementById('nav-library').classList.contains('active')) {
-            displayedTracks = [...allTracks];
-            renderTracklist(displayedTracks);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to parse sync output data cache:", err);
-      }
-    });
-
-    // 4. NOW SAFELY SPAWN THE ENGINE AFTER ALL LISTENERS ARE TRAPPED
-    await command.spawn();
-
-  } catch (err) {
-    console.error("Asynchronous process execution failed:", err);
-    scanStatusText.textContent = "Critical communication error.";
-  }
+    const selectedFolder = await open({ directory: true, multiple: false, title: 'Select Music Folder' });
+    if (selectedFolder) {
+      const command = Command.sidecar('metadata_engine', ['scan', selectedFolder]);
+      const output = await command.execute();
+      if (output.code === 0) { loadLibraryFromDatabase(); }
+    }
+  } catch (err) { console.error(err); }
 });
-
 function formatTime(seconds) {
   if (isNaN(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
