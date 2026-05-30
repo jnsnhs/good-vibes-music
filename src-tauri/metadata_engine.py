@@ -57,63 +57,72 @@ def init_db():
 
 
 def scan_directory(folder_path):
-    """Scans a directory and saves new metadata into the database."""
+    """Scans a directory and streams live progress markers to stdout."""
     if not os.path.exists(folder_path):
         return json.dumps({"error": "Directory does not exist"})
+
+    # Gather valid target files first to calculate exact percentages
+    target_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.mp3', '.m4a'))]
+    total_files = len(target_files)
+
+    if total_files == 0:
+        print("STREAM_STATUS: Complete (0 files found)", flush=True)
+        return get_all_tracks()
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    new_tracks_count = 0
+    # Inform frontend that processing has initialized
+    print(f"STREAM_STATUS: Starting scan of {total_files} files...", flush=True)
 
-    for file in os.listdir(folder_path):
-        if file.lower().endswith(('.mp3', '.m4a')):
-            file_path = os.path.join(folder_path, file)
-            
-            # Default fallbacks
-            name = file
-            artist = "Unknown Artist"
-            album = "Unknown Album"
-            cover_str = None
-            
-            try:
-                audio = File(file_path)
-                if audio is not None:
-                    # MP3 Parsing
-                    if file.lower().endswith('.mp3'):
-                        if 'TIT2' in audio: name = str(audio['TIT2'])
-                        if 'TPE1' in audio: artist = str(audio['TPE1'])
-                        if 'TALB' in audio: album = str(audio['TALB'])
-                        for key in audio.keys():
-                            if key.startswith('APIC'):
-                                base64_image = base64.b64encode(audio[key].data).decode('utf-8')
-                                cover_str = f"data:{audio[key].mime};base64,{base64_image}"
-                                break
-                    # M4A Parsing
-                    elif file.lower().endswith('.m4a'):
-                        if '\xa9nam' in audio: name = str(audio['\xa9nam'][0])
-                        if '\xa9ART' in audio: artist = str(audio['\xa9ART'][0])
-                        if '\xa9alb' in audio: album = str(audio['\xa9alb'][0])
-                        if 'covr' in audio:
-                            covr = audio['covr'][0]
-                            img_data = covr if isinstance(covr, bytes) else covr.data
-                            base64_image = base64.b64encode(img_data).decode('utf-8')
-                            cover_str = f"data:image/jpeg;base64,{base64_image}"
+    for index, file in enumerate(target_files):
+        file_path = os.path.join(folder_path, file)
+        name = file
+        artist = "Unknown Artist"
+        album = "Unknown Album"
+        cover_str = None
+        
+        try:
+            audio = File(file_path)
+            if audio is not None:
+                if file.lower().endswith('.mp3'):
+                    if 'TIT2' in audio: name = str(audio['TIT2'])
+                    if 'TPE1' in audio: artist = str(audio['TPE1'])
+                    if 'TALB' in audio: album = str(audio['TALB'])
+                    for key in audio.keys():
+                        if key.startswith('APIC'):
+                            base64_image = base64.b64encode(audio[key].data).decode('utf-8')
+                            cover_str = f"data:{audio[key].mime};base64,{base64_image}"
+                            break
+                elif file.lower().endswith('.m4a'):
+                    if '\xa9nam' in audio: name = str(audio['\xa9nam'][0])
+                    if '\xa9ART' in audio: artist = str(audio['\xa9ART'][0])
+                    if '\xa9alb' in audio: album = str(audio['\xa9alb'][0])
+                    if 'covr' in audio:
+                        covr = audio['covr'][0]
+                        img_data = covr if isinstance(covr, bytes) else covr.data
+                        base64_image = base64.b64encode(img_data).decode('utf-8')
+                        cover_str = f"data:image/jpeg;base64,{base64_image}"
 
-                # Insert or Ignore if path already exists (avoids duplicates)
-                cursor.execute("""
-                    INSERT OR IGNORE INTO tracks (path, name, artist, album, cover)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (file_path, name, artist, album, cover_str))
-                
-                if cursor.rowcount > 0:
-                    new_tracks_count += 1
+            cursor.execute("""
+                INSERT OR IGNORE INTO tracks (path, name, artist, album, cover)
+                VALUES (?, ?, ?, ?, ?)
+            """, (file_path, name, artist, album, cover_str))
 
-            except Exception as e:
-                print(f"Error parsing {file}: {str(e)}", file=sys.stderr)
+        except Exception as e:
+            # Print errors to stderr so they don't corrupt our stdout stream pipeline
+            print(f"Error parsing {file}: {str(e)}", file=sys.stderr)
+
+        # STREAM PROGRESS MATCH LINES OUT LIVE
+        # JavaScript will intercept any stdout strings starting with "STREAM_PROGRESS:"
+        percent_complete = int(((index + 1) / total_files) * 100)
+        print(f"STREAM_PROGRESS: {percent_complete}% | Processing: {name}", flush=True)
 
     conn.commit()
     conn.close()
+    
+    # Send a clear termination signal
+    print("STREAM_STATUS: Finished parsing successfully!", flush=True)
     return get_all_tracks()
 
 def get_all_tracks():
