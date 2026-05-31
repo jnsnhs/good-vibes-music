@@ -8,15 +8,8 @@
   </head>
   <body>
     <header class="app-header">
-      <h1>Good Vibes Music</h1>
-      <input
-        type="text"
-        id="search-input"
-        placeholder="Search tracks, artists, or albums..."
-      />
-      <div class="controls">
-        <button id="add-music-btn">+ Add Music</button>
-      </div>
+      <input type="text" id="search-input" placeholder="Search library..." />
+      <button id="add-music-btn">Add Music</button>
     </header>
 
     <main class="library-container">
@@ -68,14 +61,20 @@
       </div>
 
       <div class="volume-container">
-        <span style="font-size: 18px">🔊</span>
+        <button
+          id="normalize-btn"
+          class="icon-btn"
+          title="Toggle Volume Normalization"
+        >
+          🔊
+        </button>
         <input
           type="range"
           id="volume-bar"
-          value="1"
           min="0"
           max="1"
           step="0.01"
+          value="1"
         />
       </div>
     </footer>

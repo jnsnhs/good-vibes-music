@@ -65,6 +65,7 @@ class AudioStreamHandler(BaseHTTPRequestHandler):
                         
                     self.send_header('Accept-Ranges', 'bytes')
                     self.send_header('Content-Length', str(content_length))
+                    self.send_header('Access-Control-Allow-Origin', '*')
                     
                     if status_code == 206:
                         self.send_header('Content-Range', f'bytes {start_byte}-{end_byte}/{file_size}')

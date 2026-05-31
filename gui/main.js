@@ -1,10 +1,75 @@
 const audioPlayer = new Audio();
+audioPlayer.crossOrigin = "anonymous";
 let isPlaying = false;
 let libraryData = []; 
 let currentTrackIndex = -1; 
 let isShuffle = false;
 let isRepeat = false;
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
+
+// --- NEW: WEB AUDIO API & NORMALIZATION ---
+
+// Assuming you have an audio element somewhere like:
+// const audioPlayer = new Audio(); or document.getElementById('audio-player');
+// (Make sure this variable matches whatever you named your HTML5 audio object)
+
+let audioCtx;
+let audioSource;
+let compressor;
+let isNormalized = false;
+
+function initWebAudio() {
+    // The AudioContext must be created after the user interacts with the page (e.g., clicking Play)
+    if (audioCtx) return; 
+
+    // Create the audio context
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Create a source node from our HTML5 audio player
+    // IMPORTANT: Replace 'audioPlayer' with the actual variable name of your Audio object
+    audioSource = audioCtx.createMediaElementSource(audioPlayer); 
+    
+    // Create the Dynamics Compressor
+    compressor = audioCtx.createDynamicsCompressor();
+    
+    // Configure the compressor for heavy leveling (Normalization)
+    compressor.threshold.setValueAtTime(-50, audioCtx.currentTime); // Start compressing at very quiet levels
+    compressor.knee.setValueAtTime(40, audioCtx.currentTime);        // Smooth transition into compression
+    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);       // High ratio to aggressively squash loud peaks
+    compressor.attack.setValueAtTime(0, audioCtx.currentTime);       // React instantly
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);   // Release quickly
+
+    // Default routing: Source -> Speakers (Bypassed)
+    audioSource.connect(audioCtx.destination);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // Grab the button AFTER the DOM is fully loaded
+    const normalizeBtn = document.getElementById('normalize-btn');
+
+    // Make sure the button actually exists before adding the listener
+    if (normalizeBtn) {
+        normalizeBtn.addEventListener('click', () => {
+            initWebAudio();
+            
+            isNormalized = !isNormalized;
+            
+            audioSource.disconnect();
+            
+            if (isNormalized) {
+                audioSource.connect(compressor);
+                compressor.connect(audioCtx.destination);
+                normalizeBtn.classList.add('active');
+                normalizeBtn.style.backgroundColor = 'var(--accent)'; 
+            } else {
+                audioSource.connect(audioCtx.destination);
+                normalizeBtn.classList.remove('active');
+                normalizeBtn.style.backgroundColor = 'transparent'; 
+            }
+        });
+    }
+});
 
 window.addEventListener('pywebviewready', async function() {
     try {
@@ -116,6 +181,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 
 // --- Audio Playback Engine ---
 function playTrack(track, coverSrc) {
+    initWebAudio(); // Initializes the routing if it hasn't been set up yet
     const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
     
     audioPlayer.src = safePath;
