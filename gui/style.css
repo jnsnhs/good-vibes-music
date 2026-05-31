@@ -224,3 +224,100 @@ input[type="range"] {
 .col-sortable:hover {
     color: var(--accent);
 }
+
+/* =========================================
+   6. CONTEXT MENU & MODALS
+   ========================================= */
+
+.hidden {
+    display: none !important;
+}
+
+/* Right-Click Menu */
+#context-menu {
+    position: absolute;
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 5px 0;
+    z-index: 1000;
+    min-width: 150px;
+}
+
+#context-menu div {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-main);
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+#context-menu div:hover {
+    background-color: var(--bg-hover);
+}
+
+/* Modal Overlay */
+.modal {
+    position: fixed;
+    inset: 0; /* Stretches to all 4 corners */
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background-color: var(--bg-panel);
+    padding: 25px;
+    border-radius: 12px;
+    width: 350px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.input-group input {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 10px;
+    border-radius: 6px;
+    outline: none;
+}
+
+.input-group input:focus {
+    border-color: var(--accent);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.secondary-btn {
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+.secondary-btn:hover {
+    background-color: var(--bg-hover);
+}

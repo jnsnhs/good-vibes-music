@@ -79,7 +79,35 @@
         />
       </div>
     </footer>
+    <div id="context-menu" class="hidden">
+      <div id="menu-edit">✏️ Edit Info</div>
+    </div>
 
+    <div id="edit-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Edit Track Info</h3>
+
+        <div class="input-group">
+          <label>Title</label>
+          <input type="text" id="edit-title" />
+        </div>
+
+        <div class="input-group">
+          <label>Artist</label>
+          <input type="text" id="edit-artist" />
+        </div>
+
+        <div class="input-group">
+          <label>Year</label>
+          <input type="text" id="edit-year" />
+        </div>
+
+        <div class="modal-actions">
+          <button id="save-edit-btn">Save to File</button>
+          <button id="cancel-edit-btn" class="secondary-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
     <script src="main.js"></script>
   </body>
 </html>

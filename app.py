@@ -1,6 +1,8 @@
 import webview
 import sqlite3
 import base64
+import mutagen
+from mutagen._file import File
 import os
 import urllib.parse
 import threading
@@ -217,6 +219,38 @@ class Api:
         conn.close()
         
         return {"status": "success"}
+    
+    # NEW: Write metadata to MP3/M4A and update database
+    def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
+        try:
+            # 1. Update the physical file
+            # easy=True gives us a unified interface for both MP3 and M4A files
+            audio = File(file_path, easy=True) 
+            if audio is None:
+                return {"status": "error", "message": "Unsupported file format."}
+
+            # Mutagen expects lists for values
+            audio['title'] = [new_title]
+            audio['artist'] = [new_artist]
+            audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
+            audio.save()
+
+            # 2. Update the SQLite Database
+            conn = sqlite3.connect('library.db')
+            c = conn.cursor()
+            c.execute('''
+                UPDATE tracks 
+                SET title = ?, artist = ?, year = ? 
+                WHERE file_path = ?
+            ''', (new_title, new_artist, str(new_year), file_path))
+            conn.commit()
+            conn.close()
+
+            return {"status": "success"}
+
+        except Exception as e:
+            print(f"Error editing tag: {e}")
+            return {"status": "error", "message": str(e)}
 
 if __name__ == '__main__':
     init_db()
