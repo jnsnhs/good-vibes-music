@@ -159,10 +159,22 @@ class Api:
         conn = sqlite3.connect('library.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT file_path, title, artist, album, year, duration, cover_base64 FROM tracks")
+        # Removed cover_base64 from this initial query!
+        c.execute("SELECT file_path, title, artist, album, year, duration FROM tracks")
         rows = c.fetchall()
         conn.close()
         return [dict(row) for row in rows]
+
+    # NEW: Fetch image data lazily on demand
+    def get_cover(self, file_path):
+        conn = sqlite3.connect('library.db')
+        c = conn.cursor()
+        c.execute("SELECT cover_base64 FROM tracks WHERE file_path = ?", (file_path,))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+        return None
 
     def add_music(self):
         file_types = ('Audio Files (*.mp3;*.m4a)', 'All files (*.*)')

@@ -71,92 +71,150 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-window.addEventListener('pywebviewready', async function() {
+window.addEventListener('pywebviewready', async () => {
     try {
-        libraryData = await window.pywebview.api.get_library();
-        libraryData.forEach(track => addTrackToUI(track));
-    } catch (error) {
-        console.error("Error loading library:", error);
+        // Fetch the lightweight metadata from Python
+        const tracks = await window.pywebview.api.get_library();
+        
+        // Populate the master array
+        libraryData = tracks;
+        
+        // --- UPDATED ---
+        // Let the high-performance engine handle the initial render
+        renderVirtualList(); 
+        
+    } catch (e) {
+        console.error("Failed to load library:", e);
     }
 });
 
 document.getElementById('add-music-btn').addEventListener('click', async () => {
-    try {
-        const result = await window.pywebview.api.add_music();
-        if (result.status === 'success') {
-            result.tracks.forEach(track => {
-                libraryData.push(track); 
-                addTrackToUI(track);
-            });
-        }
-    } catch (error) {
-        console.error("Error adding music:", error);
+    const newTracks = await window.pywebview.api.add_music();
+    
+    if (newTracks && newTracks.length > 0) {
+        // Add the newly imported tracks to our master array
+        libraryData.push(...newTracks);
+        
+        // --- UPDATED ---
+        // Refresh the virtual view
+        renderVirtualList(); 
     }
 });
 
-// --- UPDATED: Track UI Rendering & Delete Logic ---
-function addTrackToUI(track) {
-    const list = document.getElementById('track-list');
-    const li = document.createElement('li');
-    const coverSrc = track.cover_base64 || placeholderImg;
+// --- NEW: VIRTUAL SCROLLER & LAZY LOADING ---
 
-    // Added track.year and the remove-btn
-    li.innerHTML = `
-        <img class="track-cover" src="${coverSrc}" alt="Cover">
-        <div class="track-title">${track.title}</div>
-        <div class="track-artist">${track.artist}</div>
-        <div class="track-album">${track.album}</div>
-        <div class="track-year">${track.year}</div>
-        <div class="track-duration">${track.duration}</div>
-        <button class="remove-btn" title="Remove Track">✖</button>
-    `;
+const ROW_HEIGHT = 52; 
+const ROW_BUFFER = 10; // How many rows to render off-screen to prevent flickering
+const coverCache = {}; // Cache images so we don't request them from Python twice
 
-    // 1. Play Track Listener
-    li.addEventListener('click', (e) => {
-        // Prevent the track from playing if the user actually clicked the Delete button
-        if (e.target.classList.contains('remove-btn')) return;
+const listContainer = document.getElementById('track-list-container');
+const trackList = document.getElementById('track-list');
+
+// High-performance Virtual Renderer
+function renderVirtualList() {
+    if (!libraryData.length) {
+        trackList.innerHTML = '';
+        return;
+    }
+
+    const scrollTop = listContainer.scrollTop;
+    const containerHeight = listContainer.clientHeight;
+    
+    // Calculate which indexes should be visible
+    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - ROW_BUFFER);
+    const endIndex = Math.min(libraryData.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + ROW_BUFFER);
+    
+    // Stretch the invisible container to the total height of all 5,000 songs so the scrollbar is accurate
+    trackList.style.height = `${libraryData.length * ROW_HEIGHT}px`;
+    
+    // Batch DOM updates
+    const fragment = document.createDocumentFragment();
+    
+    for (let i = startIndex; i < endIndex; i++) {
+        const track = libraryData[i];
+        const li = document.createElement('li');
         
-        currentTrackIndex = libraryData.findIndex(t => t.file_path === track.file_path);
-        playTrack(track, coverSrc);
-    });
-
-    // 2. Remove Track Listener
-    const removeBtn = li.querySelector('.remove-btn');
-    removeBtn.addEventListener('click', async (e) => {
-        e.stopPropagation(); // Stops the click from bubbling up to the row
+        // Mathematically position the row exactly where it belongs in the scroll area
+        li.style.transform = `translateY(${i * ROW_HEIGHT}px)`;
+        li.dataset.index = i; // Store index for event delegation
         
-        try {
-            // Send the file path in an array (supports multiple deletions structurally)
-            const result = await window.pywebview.api.remove_tracks([track.file_path]);
-            
-            if (result.status === 'success') {
-                // Remove from our JavaScript state
-                libraryData = libraryData.filter(t => t.file_path !== track.file_path);
-                
-                // Remove the row from the HTML DOM entirely
-                li.remove();
-                
-                // If they deleted the song that is currently playing, adjust index
-                currentTrackIndex = libraryData.findIndex(t => t.file_path === track.file_path);
-            }
-        } catch (error) {
-            console.error("Error removing track:", error);
+        // Render with a placeholder image first
+        li.innerHTML = `
+            <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || placeholderImg}" alt="">
+            <div class="track-title">${track.title}</div>
+            <div class="track-artist">${track.artist}</div>
+            <div class="track-album">${track.album}</div>
+            <div class="track-year">${track.year}</div>
+            <div class="track-duration">${track.duration}</div>
+            <button class="remove-btn" title="Remove Track">✖</button>
+        `;
+        
+        fragment.appendChild(li);
+
+        // Lazy load the image asynchronously if it's not in the JS cache
+        if (!coverCache[track.file_path]) {
+            loadCoverArt(track.file_path, i);
         }
-    });
-
-    // NEW: Right-click listener for Context Menu
-    li.addEventListener('contextmenu', (e) => {
-        e.preventDefault(); // Stop standard browser menu
-        trackBeingEdited = track;
-        
-        // Position the menu where the mouse clicked
-        contextMenu.style.left = `${e.pageX}px`;
-        contextMenu.style.top = `${e.pageY}px`;
-        contextMenu.classList.remove('hidden');
-    });
-
-    list.appendChild(li);
+    }
+    
+    trackList.innerHTML = '';
+    trackList.appendChild(fragment);
 }
+
+// Fetch image from Python without blocking the UI
+async function loadCoverArt(filePath, index) {
+    try {
+        const base64Data = await window.pywebview.api.get_cover(filePath);
+        if (base64Data) {
+            coverCache[filePath] = base64Data;
+            const imgElement = document.getElementById(`cover-${index}`);
+            if (imgElement) imgElement.src = base64Data;
+        }
+    } catch (e) {
+        console.error("Cover load failed", e);
+    }
+}
+
+// Tie the renderer to the scroll wheel via requestAnimationFrame for 60FPS smoothness
+listContainer.addEventListener('scroll', () => {
+    window.requestAnimationFrame(renderVirtualList);
+});
+
+// --- NEW: EVENT DELEGATION FOR CLICKS ---
+// One listener handles all 5,000 songs efficiently
+trackList.addEventListener('click', async (e) => {
+    const row = e.target.closest('li');
+    if (!row) return;
+    
+    const trackIndex = parseInt(row.dataset.index);
+    const track = libraryData[trackIndex];
+
+    // Handle Delete Button Click
+    if (e.target.classList.contains('remove-btn')) {
+        const result = await window.pywebview.api.remove_tracks([track.file_path]);
+        if (result.status === 'success') {
+            libraryData.splice(trackIndex, 1);
+            renderVirtualList(); // Instantly refresh UI
+        }
+        return;
+    }
+
+    // Handle Play Click
+    currentTrackIndex = trackIndex;
+    playTrack(track, coverCache[track.file_path] || placeholderImg);
+});
+
+// Right Click Context Menu via Delegation
+trackList.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const row = e.target.closest('li');
+    if (!row) return;
+
+    trackBeingEdited = libraryData[parseInt(row.dataset.index)];
+    contextMenu.style.left = `${e.pageX}px`;
+    contextMenu.style.top = `${e.pageY}px`;
+    contextMenu.classList.remove('hidden');
+});
 
 
 // --- NEW: Live Search Logic ---
@@ -307,8 +365,8 @@ volumeBar.addEventListener('input', () => {
 let currentSort = { field: null, ascending: true };
 
 // Add this function to your main.js
+
 function sortLibrary(field) {
-    // Toggle direction if clicking the same header
     if (currentSort.field === field) {
         currentSort.ascending = !currentSort.ascending;
     } else {
@@ -320,7 +378,6 @@ function sortLibrary(field) {
         let valA = a[field].toString().toLowerCase();
         let valB = b[field].toString().toLowerCase();
         
-        // Custom sort for numeric strings (like Year)
         if (field === 'year') {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;
@@ -331,10 +388,10 @@ function sortLibrary(field) {
         return 0;
     });
 
-    // Refresh UI
-    const list = document.getElementById('track-list');
-    list.innerHTML = '';
-    libraryData.forEach(track => addTrackToUI(track));
+    // --- UPDATED: No more loops or addTrackToUI ---
+    // Since the array is now sorted in memory, just tell the virtual 
+    // scroller to redraw the current scroll position!
+    renderVirtualList();
 }
 
 // Add this inside your 'pywebviewready' initialization
@@ -355,12 +412,6 @@ document.addEventListener('click', () => {
     contextMenu.classList.add('hidden');
 });
 
-// Helper: Re-draws the whole list (useful for sorting and editing)
-function renderLibrary() {
-    const list = document.getElementById('track-list');
-    list.innerHTML = '';
-    libraryData.forEach(track => addTrackToUI(track));
-}
 
 // Show the Modal
 document.getElementById('menu-edit').addEventListener('click', () => {
@@ -403,7 +454,7 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
             trackBeingEdited.year = newYear;
             
             // Re-render the UI
-            renderLibrary(); 
+            renderVirtualList(); 
             
             // If the playing track was edited, update the Now Playing UI
             if (currentTrackIndex !== -1 && libraryData[currentTrackIndex].file_path === trackBeingEdited.file_path) {
