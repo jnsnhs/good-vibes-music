@@ -170,14 +170,18 @@ function renderVirtualList() {
         const track = libraryData[i];
         const li = document.createElement('li');
         
-        // Mathematically position the row exactly where it belongs in the scroll area
-        li.style.transform = `translateY(${i * ROW_HEIGHT}px)`;
-        li.dataset.index = i; // Store index for event delegation
+        // Inside renderVirtualList() loop:
+        const isMissing = track.missing ? 'track-missing' : '';
+        const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';
         
-        // Render with a placeholder image first
+        // Mathematically position the row exactly where it belongs
+        li.style.transform = `translateY(${i * ROW_HEIGHT}px)`;
+        li.dataset.index = i; 
+        li.className = isMissing; // Apply missing opacity if needed
+        
         li.innerHTML = `
-            <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || placeholderImg}" alt="">
-            <div class="track-title">${track.title}</div>
+            <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || 'placeholder.png'}" alt="">
+            <div class="track-title">${missingWarning}${track.title}</div>
             <div class="track-artist">${track.artist}</div>
             <div class="track-album">${track.album}</div>
             <div class="track-year">${track.year}</div>
@@ -221,31 +225,48 @@ listContainer.addEventListener('scroll', () => {
 trackList.addEventListener('click', async (e) => {
     const row = e.target.closest('li');
     if (!row) return;
-    
     const trackIndex = parseInt(row.dataset.index);
     const track = libraryData[trackIndex];
-
     // Handle Delete Button Click
     if (e.target.classList.contains('remove-btn')) {
         const result = await window.pywebview.api.remove_tracks([track.file_path]);
         if (result.status === 'success') {
-            
             // UPDATED: Remove from BOTH arrays based on file_path
             const fileToDelete = track.file_path;
             masterLibraryData = masterLibraryData.filter(t => t.file_path !== fileToDelete);
             libraryData = libraryData.filter(t => t.file_path !== fileToDelete);
-            
             renderVirtualList(); 
         }
         return;
     }
-
+    // // NEW: Intercept clicks on missing tracks
+    // if (track.missing) {
+    //     // We only prompt if they clicked the row (not the delete button)
+    //     if (!e.target.classList.contains('remove-btn')) {
+    //         if (confirm(`The file for "${track.title}" cannot be found. It may have been moved or deleted.\n\nWould you like to locate it manually?`)) {
+                
+    //             const response = await window.pywebview.api.locate_missing_file(track.file_path);
+                
+    //             if (response.status === 'success') {
+    //                 // Update both our arrays with the new path
+    //                 const oldPath = track.file_path;
+    //                 track.file_path = response.new_path;
+    //                 track.missing = false;
+                    
+    //                 // Clear the old broken cover from cache
+    //                 delete coverCache[oldPath]; 
+                    
+    //                 renderVirtualList(); // Instantly visually heal the row
+    //             }
+    //         }
+    //     }
+    //     return; // Halt execution so it doesn't try to play a missing file
+    // }
     // Handle Play Click
     currentTrackIndex = trackIndex;
-    
-    // UPDATED: Use the universal helper here too
     const coverSrc = await getTrackCover(track.file_path);
-    playTrack(track, coverSrc);
+    // UPDATED: Route manual clicks through the bouncer
+    await requestPlayback(trackIndex, 1, true); // true = isManualClick
 });
 
 // Right Click Context Menu via Delegation
@@ -353,39 +374,59 @@ function playNext() {
 
 // Example Next Button Logic
 document.getElementById('next-btn').addEventListener('click', async () => {
-    if (libraryData.length === 0) return;
+    // if (libraryData.length === 0) return;
 
-    // Move to next index (looping back to start if at the end)
-    currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
-    const track = libraryData[currentTrackIndex];
-
-    // UPDATED: Await the cover art safely before playing
-    const coverSrc = await getTrackCover(track.file_path);
-    playTrack(track, coverSrc);
+    // // UPDATED: Use the smart skipping function
+    // const validIndex = getNextValidTrackIndex(currentTrackIndex, 1);
+    
+    // if (validIndex !== -1) {
+    //     currentTrackIndex = validIndex;
+    //     const track = libraryData[currentTrackIndex];
+    //     const coverSrc = await getTrackCover(track.file_path);
+    //     playTrack(track, coverSrc);
+    // } else {
+    //     alert("No valid tracks found to play.");
+    // }
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
+    await requestPlayback(targetIndex, 1, false);
 });
 
 // Example Previous Button Logic
 document.getElementById('prev-btn').addEventListener('click', async () => {
-    if (libraryData.length === 0) return;
+    // if (libraryData.length === 0) return;
 
-    // Move to prev index (looping to end if at the start)
-    currentTrackIndex = (currentTrackIndex - 1 + libraryData.length) % libraryData.length;
-    const track = libraryData[currentTrackIndex];
-
-    // UPDATED: Await the cover art safely before playing
-    const coverSrc = await getTrackCover(track.file_path);
-    playTrack(track, coverSrc);
+    // // UPDATED: Use the smart skipping function
+    // const validIndex = getNextValidTrackIndex(currentTrackIndex, -1);
+    
+    // if (validIndex !== -1) {
+    //     currentTrackIndex = validIndex;
+    //     const track = libraryData[currentTrackIndex];
+    //     const coverSrc = await getTrackCover(track.file_path);
+    //     playTrack(track, coverSrc);
+    // } else {
+    //     alert("No valid tracks found to play.");
+    // }
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, -1);
+    await requestPlayback(targetIndex, -1, false);
 });
 
 // Example Auto-Play Next Song Logic (When current track finishes)
 audioPlayer.addEventListener('ended', async () => {
-    if (libraryData.length === 0) return;
+    // if (libraryData.length === 0) return;
     
-    currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
-    const track = libraryData[currentTrackIndex];
+    // // UPDATED: Use the smart skipping function
+    // const validIndex = getNextValidTrackIndex(currentTrackIndex, 1);
     
-    const coverSrc = await getTrackCover(track.file_path);
-    playTrack(track, coverSrc);
+    // if (validIndex !== -1) {
+    //     currentTrackIndex = validIndex;
+    //     const track = libraryData[currentTrackIndex];
+    //     const coverSrc = await getTrackCover(track.file_path);
+    //     playTrack(track, coverSrc);
+    // } else {
+    //     alert("No valid tracks found to play.");
+    // }
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
+    await requestPlayback(targetIndex, 1, false);
 });
 
 
@@ -586,4 +627,70 @@ async function getTrackCover(filePath) {
     
     // 3. Fallback if the file has no cover art
     return 'placeholder.png'; 
+}
+
+// Hunts for the next available song that actually exists on the hard drive
+function getNextValidTrackIndex(startIndex, direction = 1) {
+    let index = startIndex;
+    let attempts = 0;
+    
+    // Prevent infinite loops if literally every song is missing
+    while (attempts < libraryData.length) {
+        index = (index + direction + libraryData.length) % libraryData.length;
+        if (!libraryData[index].missing) {
+            return index;
+        }
+        attempts++;
+    }
+    return -1; // Everything is dead
+}
+
+// --- NEW: Centralized Playback Request Manager ---
+async function requestPlayback(targetIndex, direction = 1, isManualClick = false) {
+    if (libraryData.length === 0 || targetIndex === -1) return;
+
+    const track = libraryData[targetIndex];
+
+    // 1. JIT VERIFICATION: Ping Python to see if the file is STILL there
+    const exists = await window.pywebview.api.check_file_exists(track.file_path);
+
+    if (!exists) {
+        // Mark as missing in memory and visually update immediately
+        track.missing = true;
+        renderVirtualList();
+
+        if (isManualClick) {
+            // BEHAVIOR A: The user explicitly clicked a dead track. Ask them to fix it.
+            if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
+                
+                const response = await window.pywebview.api.locate_missing_file(track.file_path);
+                
+                if (response.status === 'success') {
+                    const oldPath = track.file_path;
+                    track.file_path = response.new_path;
+                    track.missing = false;
+                    delete coverCache[oldPath];
+                    renderVirtualList(); // Heal UI
+                    
+                    // Success! Recursively call this function to play the healed track
+                    requestPlayback(targetIndex, direction, isManualClick);
+                }
+            }
+        } else {
+            // BEHAVIOR B: The app tried to auto-play a dead track. Skip it silently.
+            console.warn(`Skipping missing track: ${track.title}`);
+            const nextValidIndex = getNextValidTrackIndex(targetIndex, direction);
+            
+            if (nextValidIndex !== -1 && nextValidIndex !== targetIndex) {
+                // Recursively move to the next valid track
+                requestPlayback(nextValidIndex, direction, false);
+            }
+        }
+        return; // Halt execution for this dead track so the audio engine doesn't crash
+    }
+
+    // 2. FILE EXISTS: Proceed with normal playback
+    currentTrackIndex = targetIndex;
+    const coverSrc = await getTrackCover(track.file_path);
+    playTrack(track, coverSrc);
 }

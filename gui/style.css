@@ -461,3 +461,23 @@ input[type="range"] {
   background-color: var(--accent);
   transition: width 0.3s ease;
 }
+
+/* =========================================
+   9. MISSING FILE STATES
+   ========================================= */
+.track-missing {
+    opacity: 0.4;
+    cursor: default !important;
+}
+
+.track-missing .track-title {
+    color: var(--text-error, #ff5555);
+    text-decoration: line-through;
+}
+
+.missing-icon {
+    margin-right: 5px;
+    font-style: normal;
+    text-decoration: none;
+    display: inline-block;
+}

@@ -153,16 +153,46 @@ def extract_metadata(file_path):
         print(f"Error reading {file_path}: {e}")
         return None
 
+
 class Api:
+
     def get_library(self):
         conn = sqlite3.connect('library.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        # Removed cover_base64 from this initial query!
         c.execute("SELECT file_path, title, artist, album, year, duration FROM tracks")
         rows = c.fetchall()
         conn.close()
-        return [dict(row) for row in rows]
+        tracks = []
+        for row in rows:
+            track = dict(row)
+            # Fast OS check: True if file exists, False if missing
+            track['missing'] = not os.path.exists(track['file_path'])
+            tracks.append(track)
+        return tracks
+
+    def locate_missing_file(self, old_path):
+        window = webview.windows[0]
+        # Open a file dialog asking them to find the specific track
+        result = window.create_file_dialog(
+            webview.FileDialog.OPEN, 
+            allow_multiple=False, 
+            file_types=('Audio Files (*.mp3;*.m4a)',)
+        )
+        
+        if result and len(result) > 0:
+            new_path = result[0]
+            
+            # Update the database with the new file path
+            conn = sqlite3.connect('library.db')
+            c = conn.cursor()
+            c.execute("UPDATE tracks SET file_path = ? WHERE file_path = ?", (new_path, old_path))
+            conn.commit()
+            conn.close()
+            
+            return {"status": "success", "new_path": new_path}
+            
+        return {"status": "cancelled"}
 
     # NEW: Fetch image data lazily on demand
     def get_cover(self, file_path):
@@ -318,6 +348,10 @@ class Api:
         except Exception as e:
             print(f"Error editing tag: {e}")
             return {"status": "error", "message": str(e)}
+        
+    def check_file_exists(self, file_path):
+        return os.path.exists(file_path)
+    
 
 if __name__ == '__main__':
     init_db()
