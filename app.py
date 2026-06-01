@@ -1,7 +1,6 @@
 import webview
 import sqlite3
 import base64
-import mutagen
 from mutagen._file import File
 import os
 import urllib.parse
