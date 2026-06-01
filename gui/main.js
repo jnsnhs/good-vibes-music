@@ -1,7 +1,8 @@
 const audioPlayer = new Audio();
 audioPlayer.crossOrigin = "anonymous";
 let isPlaying = false;
-let libraryData = []; 
+let masterLibraryData = []; // NEW: Holds the absolute truth of all 5,000+ songs
+let libraryData = [];       // What is currently visible (filtered/sorted)
 let currentTrackIndex = -1; 
 let isShuffle = false;
 let isRepeat = false;
@@ -73,16 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('pywebviewready', async () => {
     try {
-        // Fetch the lightweight metadata from Python
         const tracks = await window.pywebview.api.get_library();
         
-        // Populate the master array
-        libraryData = tracks;
+        // Store the master list, then make a shallow copy for display
+        masterLibraryData = tracks;
+        libraryData = [...masterLibraryData]; 
         
-        // --- UPDATED ---
-        // Let the high-performance engine handle the initial render
         renderVirtualList(); 
-        
     } catch (e) {
         console.error("Failed to load library:", e);
     }
@@ -92,14 +90,14 @@ document.getElementById('add-music-btn').addEventListener('click', async () => {
     const newTracks = await window.pywebview.api.add_music();
     
     if (newTracks && newTracks.length > 0) {
-        // Add the newly imported tracks to our master array
-        libraryData.push(...newTracks);
+        // Push to master
+        masterLibraryData.push(...newTracks);
         
-        // --- UPDATED ---
-        // Refresh the virtual view
-        renderVirtualList(); 
+        // Re-trigger the search input so the new tracks are filtered correctly
+        document.getElementById('search-input').dispatchEvent(new Event('input'));
     }
 });
+
 
 // --- NEW: VIRTUAL SCROLLER & LAZY LOADING ---
 
@@ -193,15 +191,23 @@ trackList.addEventListener('click', async (e) => {
     if (e.target.classList.contains('remove-btn')) {
         const result = await window.pywebview.api.remove_tracks([track.file_path]);
         if (result.status === 'success') {
-            libraryData.splice(trackIndex, 1);
-            renderVirtualList(); // Instantly refresh UI
+            
+            // UPDATED: Remove from BOTH arrays based on file_path
+            const fileToDelete = track.file_path;
+            masterLibraryData = masterLibraryData.filter(t => t.file_path !== fileToDelete);
+            libraryData = libraryData.filter(t => t.file_path !== fileToDelete);
+            
+            renderVirtualList(); 
         }
         return;
     }
 
     // Handle Play Click
     currentTrackIndex = trackIndex;
-    playTrack(track, coverCache[track.file_path] || placeholderImg);
+    
+    // UPDATED: Use the universal helper here too
+    const coverSrc = await getTrackCover(track.file_path);
+    playTrack(track, coverSrc);
 });
 
 // Right Click Context Menu via Delegation
@@ -307,19 +313,41 @@ function playNext() {
     playTrack(nextTrack, nextTrack.cover_base64 || placeholderImg);
 }
 
-document.getElementById('next-btn').addEventListener('click', playNext);
-audioPlayer.addEventListener('ended', playNext);
+// Example Next Button Logic
+document.getElementById('next-btn').addEventListener('click', async () => {
+    if (libraryData.length === 0) return;
 
-// Previous Button Logic
-document.getElementById('prev-btn').addEventListener('click', () => {
-    if (libraryData.length === 0 || currentTrackIndex === -1) return;
-    if (audioPlayer.currentTime > 3) {
-        audioPlayer.currentTime = 0;
-    } else {
-        currentTrackIndex = (currentTrackIndex - 1 + libraryData.length) % libraryData.length;
-        const prevTrack = libraryData[currentTrackIndex];
-        playTrack(prevTrack, prevTrack.cover_base64 || placeholderImg);
-    }
+    // Move to next index (looping back to start if at the end)
+    currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
+    const track = libraryData[currentTrackIndex];
+
+    // UPDATED: Await the cover art safely before playing
+    const coverSrc = await getTrackCover(track.file_path);
+    playTrack(track, coverSrc);
+});
+
+// Example Previous Button Logic
+document.getElementById('prev-btn').addEventListener('click', async () => {
+    if (libraryData.length === 0) return;
+
+    // Move to prev index (looping to end if at the start)
+    currentTrackIndex = (currentTrackIndex - 1 + libraryData.length) % libraryData.length;
+    const track = libraryData[currentTrackIndex];
+
+    // UPDATED: Await the cover art safely before playing
+    const coverSrc = await getTrackCover(track.file_path);
+    playTrack(track, coverSrc);
+});
+
+// Example Auto-Play Next Song Logic (When current track finishes)
+audioPlayer.addEventListener('ended', async () => {
+    if (libraryData.length === 0) return;
+    
+    currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
+    const track = libraryData[currentTrackIndex];
+    
+    const coverSrc = await getTrackCover(track.file_path);
+    playTrack(track, coverSrc);
 });
 
 
@@ -472,3 +500,52 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     editModal.classList.add('hidden');
     trackBeingEdited = null;
 });
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    
+    if (query === '') {
+        // If search is empty, restore the full library
+        libraryData = [...masterLibraryData];
+    } else {
+        // Filter the master list based on Title, Artist, or Album
+        libraryData = masterLibraryData.filter(track => {
+            // Safely handle null/undefined fields just in case
+            const title = (track.title || '').toLowerCase();
+            const artist = (track.artist || '').toLowerCase();
+            const album = (track.album || '').toLowerCase();
+            
+            return title.includes(query) || artist.includes(query) || album.includes(query);
+        });
+    }
+    
+    // CRITICAL: Reset scroll position to top. 
+    // If you are scrolled down to song #4000 and search for a single track, 
+    // the virtual scroller will render blank space unless we snap back to the top!
+    document.getElementById('track-list-container').scrollTop = 0;
+    
+    // Re-draw the screen
+    renderVirtualList();
+});
+
+// --- NEW: Universal Cover Art Fetcher ---
+async function getTrackCover(filePath) {
+    // 1. If we already have it in memory, return it instantly
+    if (coverCache[filePath]) {
+        return coverCache[filePath];
+    }
+    
+    // 2. If not, ask the Python backend for it
+    try {
+        const base64Data = await window.pywebview.api.get_cover(filePath);
+        if (base64Data) {
+            coverCache[filePath] = base64Data; // Save it for later
+            return base64Data;
+        }
+    } catch (e) {
+        console.error("Cover fetch failed during playback:", e);
+    }
+    
+    // 3. Fallback if the file has no cover art
+    return 'placeholder.png'; 
+}
