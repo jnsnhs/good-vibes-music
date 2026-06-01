@@ -86,18 +86,56 @@ window.addEventListener('pywebviewready', async () => {
     }
 });
 
-document.getElementById('add-music-btn').addEventListener('click', async () => {
-    const newTracks = await window.pywebview.api.add_music();
+const addMusicBtn = document.getElementById('add-music-btn');
+
+addMusicBtn.addEventListener('click', async () => {
+    const response = await window.pywebview.api.add_music();
     
-    if (newTracks && newTracks.length > 0) {
-        // Push to master
-        masterLibraryData.push(...newTracks);
+    if (response.status === 'started') {
+        const container = document.getElementById('import-progress-container');
+        const fill = document.getElementById('import-progress-fill');
+        const countText = document.getElementById('import-count');
         
-        // Re-trigger the search input so the new tracks are filtered correctly
-        document.getElementById('search-input').dispatchEvent(new Event('input'));
+        // Lock the button & show progress bar
+        addMusicBtn.disabled = true;
+        addMusicBtn.style.opacity = '0.5';
+        container.classList.remove('hidden');
+        fill.style.width = '0%';
+
+        // Begin polling Python every 500ms
+        const pollInterval = setInterval(async () => {
+            const state = await window.pywebview.api.get_import_progress();
+            
+            // Update UI visuals
+            countText.innerText = `${state.current} / ${state.total}`;
+            const percentage = (state.current / state.total) * 100;
+            fill.style.width = `${percentage}%`;
+            
+            // Check if thread is completely finished
+            if (!state.is_running && state.current === state.total) {
+                clearInterval(pollInterval); // Stop asking Python
+                
+                // Safely merge new tracks into our master list
+                if (state.new_tracks.length > 0) {
+                    masterLibraryData.push(...state.new_tracks);
+                    
+                    // Trigger the search input to push master to display & refresh the Virtual Scroller!
+                    document.getElementById('search-input').dispatchEvent(new Event('input'));
+                }
+                
+                // Let the bar sit at 100% for a second before hiding it
+                setTimeout(() => {
+                    container.classList.add('hidden');
+                    addMusicBtn.disabled = false;
+                    addMusicBtn.style.opacity = '1';
+                }, 1500);
+            }
+        }, 500);
+        
+    } else if (response.status === 'busy') {
+        alert("An import is already running in the background.");
     }
 });
-
 
 // --- NEW: VIRTUAL SCROLLER & LAZY LOADING ---
 

@@ -176,47 +176,102 @@ class Api:
             return row[0]
         return None
 
+    def __init__(self):
+        # NEW: State dictionary to track progress
+        self.import_state = {
+            "is_running": False,
+            "current": 0,
+            "total": 0,
+            "new_tracks": []
+        }
+
+    # 1. The Trigger Method
     def add_music(self):
-        file_types = ('Audio Files (*.mp3;*.m4a)', 'All files (*.*)')
-        selected_files = webview.windows[0].create_file_dialog(
-            webview.FileDialog.OPEN, 
-            allow_multiple=True, 
-            file_types=file_types
-        )
+        if self.import_state["is_running"]:
+            return {"status": "busy"}
+
+        # Ask user for files
+        window = webview.windows[0]
+        files = window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True, file_types=('Audio Files (*.mp3;*.m4a)',))
         
-        if not selected_files:
+        if not files:
             return {"status": "cancelled"}
+
+        # Reset state
+        self.import_state = {
+            "is_running": True,
+            "current": 0,
+            "total": len(files),
+            "new_tracks": []
+        }
+        
+        # Spin up the background worker thread
+        threading.Thread(target=self._process_files_thread, args=(files,), daemon=True).start()
+        
+        return {"status": "started"}
+
+    # 2. The Background Worker Thread
+    # 2. The Background Worker Thread
+    def _process_files_thread(self, files):
+        # MUST open a new connection strictly for this thread
+        import sqlite3
+        import time
+        import base64 # Needed for the cover art
+        from tinytag import TinyTag
         
         conn = sqlite3.connect('library.db')
         c = conn.cursor()
-        added_tracks = []
         
-        for file_path in selected_files:
-            meta = extract_metadata(file_path)
-            if not meta:
-                continue
-                
+        for file_path in files:
             try:
-                c.execute('''
-                    INSERT INTO tracks (file_path, title, artist, album, year, duration, cover_base64) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (file_path, meta['title'], meta['artist'], meta['album'], meta['year'], meta['duration'], meta['cover']))
+                # FIX 1: Tell TinyTag to extract the image data
+                tag = TinyTag.get(file_path, image=True)
+                title = tag.title or "Unknown"
+                artist = tag.artist or "Unknown"
+                album = tag.album or "Unknown"
+                year = str(tag.year) if tag.year else ""
                 
-                track_data = meta.copy()
-                track_data['file_path'] = file_path
-                track_data['cover_base64'] = meta['cover']
-                added_tracks.append(track_data)
+                # Convert duration to MM:SS
+                duration = time.strftime('%M:%S', time.gmtime(tag.duration or 0))
                 
-            except sqlite3.IntegrityError:
-                pass
+                # FIX 1: Process and encode the cover art
+                cover_base64 = None
+                image_data = tag.get_image()
+                if image_data:
+                    cover_base64 = "data:image/jpeg;base64," + base64.b64encode(image_data).decode('utf-8')
                 
+                # FIX 1: Add cover_base64 back to the INSERT statement
+                c.execute('''INSERT OR IGNORE INTO tracks 
+                             (file_path, title, artist, album, year, duration, cover_base64) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                          (file_path, title, artist, album, year, duration, cover_base64))
+                
+                # FIX 2: c.rowcount will be 1 if a new row was added, and 0 if IGNORE triggered.
+                # We only send data back to the JavaScript GUI if it is genuinely a new track.
+                if c.rowcount > 0:
+                    self.import_state["new_tracks"].append({
+                        "file_path": file_path,
+                        "title": title,
+                        "artist": artist,
+                        "album": album,
+                        "year": year,
+                        "duration": duration
+                    })
+            except Exception as e:
+                print(f"Error parsing {file_path}: {e}")
+            
+            # Increment progress counter
+            self.import_state["current"] += 1
+            
         conn.commit()
         conn.close()
         
-        if added_tracks:
-            return {"status": "success", "tracks": added_tracks}
-        else:
-            return {"status": "duplicate"}
+        # Flag thread as done
+        self.import_state["is_running"] = False
+
+    # 3. The Polling Endpoint
+    def get_import_progress(self):
+        return self.import_state
 
     # NEW: Securely remove single or multiple files from the database
     def remove_tracks(self, file_paths):
