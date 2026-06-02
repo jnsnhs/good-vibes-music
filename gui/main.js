@@ -600,7 +600,7 @@ document.querySelectorAll('.col-sortable').forEach(header => {
 
 let trackBeingEdited = null;
 const contextMenu = document.getElementById('context-menu');
-const editModal = document.getElementById('edit-modal');
+// const editModal = document.getElementById('edit-modal');
 
 // Hide context menu when clicking anywhere else
 document.addEventListener('click', () => {
@@ -621,52 +621,52 @@ document.addEventListener('click', () => {
 // });
 
 // Cancel Button
-document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-    editModal.classList.add('hidden');
-    trackBeingEdited = null;
-});
+// document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+//     editModal.classList.add('hidden');
+//     trackBeingEdited = null;
+// });
 
 // Save Button
-document.getElementById('save-edit-btn').addEventListener('click', async () => {
-    if (!trackBeingEdited) return;
+// document.getElementById('save-edit-btn').addEventListener('click', async () => {
+//     if (!trackBeingEdited) return;
     
-    const newTitle = document.getElementById('edit-title').value;
-    const newArtist = document.getElementById('edit-artist').value;
-    const newYear = document.getElementById('edit-year').value;
+//     const newTitle = document.getElementById('edit-title').value;
+//     const newArtist = document.getElementById('edit-artist').value;
+//     const newYear = document.getElementById('edit-year').value;
     
-    // Visual feedback while saving
-    document.getElementById('save-edit-btn').innerText = "Saving...";
+//     // Visual feedback while saving
+//     document.getElementById('save-edit-btn').innerText = "Saving...";
     
-    try {
-        const result = await window.pywebview.api.edit_track_metadata(
-            trackBeingEdited.file_path, newTitle, newArtist, newYear
-        );
+//     try {
+//         const result = await window.pywebview.api.edit_track_metadata(
+//             trackBeingEdited.file_path, newTitle, newArtist, newYear
+//         );
         
-        if (result.status === 'success') {
-            // Update JS State
-            trackBeingEdited.title = newTitle;
-            trackBeingEdited.artist = newArtist;
-            trackBeingEdited.year = newYear;
+//         if (result.status === 'success') {
+//             // Update JS State
+//             trackBeingEdited.title = newTitle;
+//             trackBeingEdited.artist = newArtist;
+//             trackBeingEdited.year = newYear;
             
-            // Re-render the UI
-            renderVirtualList(); 
+//             // Re-render the UI
+//             renderVirtualList(); 
             
-            // If the playing track was edited, update the Now Playing UI
-            if (currentTrackIndex !== -1 && libraryData[currentTrackIndex].file_path === trackBeingEdited.file_path) {
-                document.getElementById('np-title').innerText = newTitle;
-                document.getElementById('np-artist').innerText = newArtist;
-            }
-        } else {
-            alert("Error saving file: " + result.message);
-        }
-    } catch (e) {
-        console.error(e);
-    }
+//             // If the playing track was edited, update the Now Playing UI
+//             if (currentTrackIndex !== -1 && libraryData[currentTrackIndex].file_path === trackBeingEdited.file_path) {
+//                 document.getElementById('np-title').innerText = newTitle;
+//                 document.getElementById('np-artist').innerText = newArtist;
+//             }
+//         } else {
+//             alert("Error saving file: " + result.message);
+//         }
+//     } catch (e) {
+//         console.error(e);
+//     }
     
-    document.getElementById('save-edit-btn').innerText = "Save to File";
-    editModal.classList.add('hidden');
-    trackBeingEdited = null;
-});
+//     document.getElementById('save-edit-btn').innerText = "Save to File";
+//     editModal.classList.add('hidden');
+//     trackBeingEdited = null;
+// });
 
 // --- NEW: Universal Cover Art Fetcher ---
 async function getTrackCover(filePath) {
@@ -755,3 +755,117 @@ async function requestPlayback(targetIndex, direction = 1, isManualClick = false
     const coverSrc = await getTrackCover(track.file_path);
     playTrack(track, coverSrc);
 }
+
+const editModal = document.getElementById('edit-modal-overlay');
+const fieldsToEdit = ['title', 'artist', 'album', 'album_artist', 'genre', 'year', 'track_num', 'disc_num', 'comments'];
+
+// 1. Open the Modal from Context Menu
+document.getElementById('ctx-edit').addEventListener('click', () => {
+    const pathsArray = Array.from(selectedPaths);
+    if (pathsArray.length === 0) return;
+    
+    // Hide context menu, show modal
+    document.getElementById('context-menu').classList.add('hidden');
+    editModal.classList.remove('hidden');
+
+    // Populate Fields securely
+    fieldsToEdit.forEach(field => {
+        const input = document.getElementById(`edit-${field}`);
+        
+        // Find the value of the first selected track
+        const firstVal = masterLibraryData.find(t => t.file_path === pathsArray[0])[field];
+        
+        // Check if ALL selected tracks share this exact same value
+        const allSame = pathsArray.every(path => {
+            const track = masterLibraryData.find(t => t.file_path === path);
+            return track[field] === firstVal;
+        });
+
+        if (allSame) {
+            input.value = firstVal || "";
+            input.placeholder = "";
+        } else {
+            input.value = "";
+            input.placeholder = "(Multiple Values)";
+        }
+        
+        // Store original state on the element so we know if they changed it
+        input.dataset.original = input.value;
+    });
+
+    // Handle Compilation checkbox separately (as it's a boolean 1 or 0)
+    const compBox = document.getElementById('edit-compilation');
+    const firstComp = masterLibraryData.find(t => t.file_path === pathsArray[0]).compilation;
+    const allSameComp = pathsArray.every(path => masterLibraryData.find(t => t.file_path === path).compilation === firstComp);
+    
+    compBox.indeterminate = !allSameComp; // Shows a dash if mixed values
+    compBox.checked = allSameComp ? (firstComp === 1) : false;
+    compBox.dataset.originalState = allSameComp ? (firstComp === 1).toString() : "mixed";
+});
+
+// 2. Close Modal
+document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+    editModal.classList.add('hidden');
+});
+
+// 3. Save Changes
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+    const pathsArray = Array.from(selectedPaths);
+    const saveBtn = document.getElementById('btn-save-edit');
+    const modifiedData = {};
+
+    // Check which text fields were ACTUALLY modified by the user
+    fieldsToEdit.forEach(field => {
+        const input = document.getElementById(`edit-${field}`);
+        
+        // Only queue the data if they typed something new, or if they cleared a previously shared value
+        if (input.value !== input.dataset.original) {
+            // Protect against them typing nothing into a (Multiple Values) field
+            if (!(input.placeholder === "(Multiple Values)" && input.value === "")) {
+                modifiedData[field] = input.value;
+            }
+        }
+    });
+
+    // Check compilation checkbox
+    const compBox = document.getElementById('edit-compilation');
+    if (compBox.dataset.originalState === "mixed" && !compBox.indeterminate) {
+        modifiedData['compilation'] = compBox.checked ? 1 : 0;
+    } else if (compBox.dataset.originalState !== "mixed" && compBox.checked.toString() !== compBox.dataset.originalState) {
+        modifiedData['compilation'] = compBox.checked ? 1 : 0;
+    }
+
+    // If nothing was actually changed, just close it
+    if (Object.keys(modifiedData).length === 0) {
+        editModal.classList.add('hidden');
+        return;
+    }
+
+    // Disable button to prevent double-clicks while writing to disk
+    saveBtn.innerText = "Saving...";
+    saveBtn.disabled = true;
+
+    // Send to Python
+    const result = await window.pywebview.api.update_metadata(pathsArray, modifiedData);
+
+    if (result.status === 'success') {
+        // Update local memory so we don't need to query the database again
+        pathsArray.forEach(path => {
+            const masterTrack = masterLibraryData.find(t => t.file_path === path);
+            Object.keys(modifiedData).forEach(key => {
+                masterTrack[key] = modifiedData[key];
+            });
+        });
+        
+        // Re-run the current search to update the visual display
+        document.getElementById('search-input').dispatchEvent(new Event('input'));
+        
+        editModal.classList.add('hidden');
+    } else {
+        alert("An error occurred while saving metadata. Check the console.");
+    }
+
+    // Reset button
+    saveBtn.innerText = "Save Changes";
+    saveBtn.disabled = false;
+});

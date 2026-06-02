@@ -1,5 +1,6 @@
 import webview
 import sqlite3
+import music_tag
 import base64
 from mutagen._file import File
 import os
@@ -373,6 +374,48 @@ class Api:
             print(f"Error editing tag: {e}")
             return {"status": "error", "message": str(e)}
         
+    def update_metadata(self, file_paths, modified_data):
+
+        
+        # Map our database column names to music_tag's specific keys
+        tag_map = {
+            'title': 'title', 'artist': 'artist', 'album': 'album',
+            'year': 'year', 'album_artist': 'albumartist', 'genre': 'genre',
+            'track_num': 'tracknumber', 'disc_num': 'discnumber',
+            'compilation': 'compilation', 'comments': 'comment'
+        }
+
+        conn = sqlite3.connect('library.db')
+        c = conn.cursor()
+
+        try:
+            for path in file_paths:
+                # 1. Update the Physical Audio File
+                f = music_tag.load_file(path)
+                print(f)
+                # for key, val in modified_data.items():
+                #     if key in tag_map:
+                #         f[tag_map[key]] = val
+                # f.save()
+
+                # # 2. Update the SQLite Database dynamically
+                # # We only update the columns that were actually modified
+                # set_clause = ", ".join([f"{k} = ?" for k in modified_data.keys()])
+                # values = list(modified_data.values())
+                # values.append(path) # Add path for the WHERE clause
+                
+                # c.execute(f"UPDATE tracks SET {set_clause} WHERE file_path = ?", values)
+                
+            conn.commit()
+            status = "success"
+        except Exception as e:
+            print(f"Failed to edit metadata: {e}")
+            status = "error"
+            
+        conn.close()
+        return {"status": status}
+
+
     def check_file_exists(self, file_path):
         return os.path.exists(file_path)
     

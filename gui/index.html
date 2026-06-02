@@ -88,7 +88,7 @@
       </div>
     </div>
 
-    <div id="edit-modal" class="modal hidden">
+    <!-- <div id="edit-modal" class="modal hidden">
       <div class="modal-content">
         <h3>Edit Track Info</h3>
 
@@ -112,6 +112,58 @@
           <button id="cancel-edit-btn" class="secondary-btn">Cancel</button>
         </div>
       </div>
+    </div> -->
+
+    <div id="edit-modal-overlay" class="hidden">
+        <div class="modal-content">
+            <h2>Edit Metadata</h2>
+            <div class="edit-grid">
+                <div class="input-group">
+                    <label>Title</label>
+                    <input type="text" id="edit-title">
+                </div>
+                <div class="input-group">
+                    <label>Artist</label>
+                    <input type="text" id="edit-artist">
+                </div>
+                <div class="input-group">
+                    <label>Album</label>
+                    <input type="text" id="edit-album">
+                </div>
+                <div class="input-group">
+                    <label>Album Artist</label>
+                    <input type="text" id="edit-album_artist">
+                </div>
+                <div class="input-group">
+                    <label>Genre</label>
+                    <input type="text" id="edit-genre">
+                </div>
+                <div class="input-group">
+                    <label>Year</label>
+                    <input type="text" id="edit-year">
+                </div>
+                <div class="input-group">
+                    <label>Track #</label>
+                    <input type="text" id="edit-track_num">
+                </div>
+                <div class="input-group">
+                    <label>Disc #</label>
+                    <input type="text" id="edit-disc_num">
+                </div>
+                <div class="input-group full-width">
+                    <label>Comments</label>
+                    <input type="text" id="edit-comments">
+                </div>
+                <div class="input-group full-width checkbox-group">
+                    <input type="checkbox" id="edit-compilation">
+                    <label for="edit-compilation">Part of a compilation</label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-cancel-edit" class="secondary-btn">Cancel</button>
+                <button id="btn-save-edit" class="primary-btn">Save Changes</button>
+            </div>
+        </div>
     </div>
 
     <div id="import-progress-container" class="hidden">
