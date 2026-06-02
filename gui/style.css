@@ -580,3 +580,21 @@ input[type="range"] {
     justify-content: flex-end;
     gap: 10px;
 }
+
+/* =========================================
+   11. NOW PLAYING STATE
+   ========================================= */
+.track-playing {
+    background-color: rgba(29, 185, 84, 0.1) !important; /* Subtle tint using your accent color */
+    color: var(--accent) !important;
+    font-weight: bold;
+}
+
+.track-playing .track-title {
+    color: var(--accent) !important;
+}
+
+.track-playing .track-artist,
+.track-playing .track-album {
+    color: var(--accent) !important;
+}

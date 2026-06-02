@@ -167,7 +167,20 @@ class Api:
         conn = sqlite3.connect('library.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT file_path, title, artist, album, year, duration FROM tracks")
+        c.execute("""SELECT
+                  file_path,
+                  title,
+                  artist,
+                  album,
+                  year,
+                  duration,
+                  album_artist,
+                  genre,
+                  track_num,
+                  disc_num,
+                  compilation,
+                  comments
+            FROM tracks""")
         rows = c.fetchall()
         conn.close()
         tracks = []
@@ -343,36 +356,36 @@ class Api:
         return {"status": "success"}
     
     # NEW: Write metadata to MP3/M4A and update database
-    def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
-        try:
-            # 1. Update the physical file
-            # easy=True gives us a unified interface for both MP3 and M4A files
-            audio = File(file_path, easy=True) 
-            if audio is None:
-                return {"status": "error", "message": "Unsupported file format."}
+    # def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
+    #     try:
+    #         # 1. Update the physical file
+    #         # easy=True gives us a unified interface for both MP3 and M4A files
+    #         audio = File(file_path, easy=True) 
+    #         if audio is None:
+    #             return {"status": "error", "message": "Unsupported file format."}
 
-            # Mutagen expects lists for values
-            audio['title'] = [new_title]
-            audio['artist'] = [new_artist]
-            audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
-            audio.save()
+    #         # Mutagen expects lists for values
+    #         audio['title'] = [new_title]
+    #         audio['artist'] = [new_artist]
+    #         audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
+    #         audio.save()
 
-            # 2. Update the SQLite Database
-            conn = sqlite3.connect('library.db')
-            c = conn.cursor()
-            c.execute('''
-                UPDATE tracks 
-                SET title = ?, artist = ?, year = ? 
-                WHERE file_path = ?
-            ''', (new_title, new_artist, str(new_year), file_path))
-            conn.commit()
-            conn.close()
+    #         # 2. Update the SQLite Database
+    #         conn = sqlite3.connect('library.db')
+    #         c = conn.cursor()
+    #         c.execute('''
+    #             UPDATE tracks 
+    #             SET title = ?, artist = ?, year = ? 
+    #             WHERE file_path = ?
+    #         ''', (new_title, new_artist, str(new_year), file_path))
+    #         conn.commit()
+    #         conn.close()
 
-            return {"status": "success"}
+    #         return {"status": "success"}
 
-        except Exception as e:
-            print(f"Error editing tag: {e}")
-            return {"status": "error", "message": str(e)}
+    #     except Exception as e:
+    #         print(f"Error editing tag: {e}")
+    #         return {"status": "error", "message": str(e)}
         
     def update_metadata(self, file_paths, modified_data):
 
@@ -393,18 +406,18 @@ class Api:
                 # 1. Update the Physical Audio File
                 f = music_tag.load_file(path)
                 print(f)
-                # for key, val in modified_data.items():
-                #     if key in tag_map:
-                #         f[tag_map[key]] = val
-                # f.save()
+                for key, val in modified_data.items():
+                    if key in tag_map:
+                        f[tag_map[key]] = val  # type: ignore
+                f.save()  # type: ignore
 
-                # # 2. Update the SQLite Database dynamically
-                # # We only update the columns that were actually modified
-                # set_clause = ", ".join([f"{k} = ?" for k in modified_data.keys()])
-                # values = list(modified_data.values())
-                # values.append(path) # Add path for the WHERE clause
+                # 2. Update the SQLite Database dynamically
+                # We only update the columns that were actually modified
+                set_clause = ", ".join([f"{k} = ?" for k in modified_data.keys()])
+                values = list(modified_data.values())
+                values.append(path) # Add path for the WHERE clause
                 
-                # c.execute(f"UPDATE tracks SET {set_clause} WHERE file_path = ?", values)
+                c.execute(f"UPDATE tracks SET {set_clause} WHERE file_path = ?", values)
                 
             conn.commit()
             status = "success"
