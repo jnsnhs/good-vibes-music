@@ -284,21 +284,27 @@ trackList.addEventListener('contextmenu', (e) => {
 
 // --- NEW: Live Search Logic ---
 document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    const listItems = document.querySelectorAll('#track-list li');
+    const query = e.target.value.toLowerCase().trim();
     
-    listItems.forEach(li => {
-        // Grab all text inside the row (title, artist, album)
-        const trackText = li.innerText.toLowerCase();
+    if (query === '') {
+        libraryData = [...masterLibraryData];
+    } else {
+        // Split the search query into an array of individual words
+        const searchTerms = query.split(/\s+/);
+
+        console.log(searchTerms);
         
-        // Toggle visibility based on match. 
-        // We use 'grid' instead of 'block' to maintain our CSS columns!
-        if (trackText.includes(query)) {
-            li.style.display = 'grid';
-        } else {
-            li.style.display = 'none';
-        }
-    });
+        libraryData = masterLibraryData.filter(track => {
+            // Combine all searchable fields into one giant string for easy checking
+            const searchableText = `${track.title || ''} ${track.artist || ''} ${track.album || ''}`.toLowerCase();
+            
+            // Check if EVERY search term exists SOMEWHERE in the searchable text
+            return searchTerms.every(term => searchableText.includes(term));
+        });
+    }
+    
+    document.getElementById('track-list-container').scrollTop = 0;
+    renderVirtualList();
 });
 
 
