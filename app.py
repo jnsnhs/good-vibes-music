@@ -116,8 +116,14 @@ def init_db():
             title TEXT,
             artist TEXT,
             album TEXT,
-            year TEXT, 
+            year TEXT,
             duration TEXT,
+            album_artist TEXT,
+            genre TEXT,
+            track_num TEXT,
+            disc_num TEXT, 
+            compilation INTEGER,
+            comments TEXT,
             cover_base64 TEXT
         )
     ''')
@@ -260,7 +266,16 @@ class Api:
                 album = tag.album or "Unknown"
                 year = str(tag.year) if tag.year else ""
                 
-                # Convert duration to MM:SS
+                # --- NEW METADATA EXTRACTIONS ---
+                album_artist = tag.albumartist or ""
+                genre = tag.genre or ""
+                track_num = str(tag.track) if tag.track else ""
+                disc_num = str(tag.disc) if tag.disc else ""
+                comments = tag.comment or ""
+                
+                # Infer compilation status (1 for True, 0 for False)
+                is_compilation = 1 if album_artist.lower() in ['various artists', 'various'] else 0
+                
                 duration = time.strftime('%M:%S', time.gmtime(tag.duration or 0))
                 
                 # FIX 1: Process and encode the cover art
@@ -270,10 +285,13 @@ class Api:
                     cover_base64 = "data:image/jpeg;base64," + base64.b64encode(image_data).decode('utf-8')
                 
                 # FIX 1: Add cover_base64 back to the INSERT statement
+                # --- UPDATED INSERT STATEMENT ---
                 c.execute('''INSERT OR IGNORE INTO tracks 
-                             (file_path, title, artist, album, year, duration, cover_base64) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                          (file_path, title, artist, album, year, duration, cover_base64))
+                             (file_path, title, artist, album, year, duration, 
+                              album_artist, genre, track_num, disc_num, compilation, comments, cover_base64) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                          (file_path, title, artist, album, year, duration, 
+                           album_artist, genre, track_num, disc_num, is_compilation, comments, cover_base64))
                 
                 # FIX 2: c.rowcount will be 1 if a new row was added, and 0 if IGNORE triggered.
                 # We only send data back to the JavaScript GUI if it is genuinely a new track.
@@ -284,7 +302,13 @@ class Api:
                         "artist": artist,
                         "album": album,
                         "year": year,
-                        "duration": duration
+                        "duration": duration,
+                        "album_artist": album_artist,
+                        "genre": genre,
+                        "track_num": track_num,
+                        "disc_num": disc_num,
+                        "is_compilation": is_compilation,
+                        "comments": comments
                     })
             except Exception as e:
                 print(f"Error parsing {file_path}: {e}")
