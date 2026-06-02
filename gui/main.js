@@ -6,6 +6,7 @@ let libraryData = [];       // What is currently visible (filtered/sorted)
 let currentTrackIndex = -1; 
 let isShuffle = false;
 let isRepeat = false;
+let selectedPaths = new Set(); // Stores the file_paths of selected tracks
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
 
 // --- NEW: WEB AUDIO API & NORMALIZATION ---
@@ -171,13 +172,14 @@ function renderVirtualList() {
         const li = document.createElement('li');
         
         // Inside renderVirtualList() loop:
-        const isMissing = track.missing ? 'track-missing' : '';
+        const isSelected = selectedPaths.has(track.file_path) ? ' track-selected' : '';
+        const isMissing = track.missing ? ' track-missing' : '';
         const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';
         
         // Mathematically position the row exactly where it belongs
         li.style.transform = `translateY(${i * ROW_HEIGHT}px)`;
         li.dataset.index = i; 
-        li.className = isMissing; // Apply missing opacity if needed
+        li.className = `${isMissing}${isSelected}`; // Combine classes
         
         li.innerHTML = `
             <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || 'placeholder.png'}" alt="">
@@ -186,7 +188,6 @@ function renderVirtualList() {
             <div class="track-album">${track.album}</div>
             <div class="track-year">${track.year}</div>
             <div class="track-duration">${track.duration}</div>
-            <button class="remove-btn" title="Remove Track">✖</button>
         `;
         
         fragment.appendChild(li);
@@ -220,66 +221,149 @@ listContainer.addEventListener('scroll', () => {
     window.requestAnimationFrame(renderVirtualList);
 });
 
-// --- NEW: EVENT DELEGATION FOR CLICKS ---
-// One listener handles all 5,000 songs efficiently
-trackList.addEventListener('click', async (e) => {
+const doubleClickDelay = 200;
+let doubleClickOnTrackPossible = false;
+
+document.getElementById('track-list').addEventListener('click', (e) => {
+    if (!doubleClickOnTrackPossible) {
+        singleClickOnTrack(e);
+        doubleClickOnTrackPossible = true;
+        let timer = setTimeout(() => {
+            doubleClickOnTrackPossible = false;
+        }, doubleClickDelay);
+    } else {
+        doubleClickOnTrack(e);
+    }    
+});
+
+async function doubleClickOnTrack(e) {
+    const row = e.target.closest('li');
+    if (!row) return;
+    const trackIndex = parseInt(row.dataset.index);
+    // Clear user text-selection that happens accidentally when double-clicking
+    window.getSelection().removeAllRanges(); 
+    await requestPlayback(trackIndex, 1, true); // Send to your bouncer!
+}
+
+function singleClickOnTrack(e) {
     const row = e.target.closest('li');
     if (!row) return;
     const trackIndex = parseInt(row.dataset.index);
     const track = libraryData[trackIndex];
-    // Handle Delete Button Click
-    if (e.target.classList.contains('remove-btn')) {
-        const result = await window.pywebview.api.remove_tracks([track.file_path]);
-        if (result.status === 'success') {
-            // UPDATED: Remove from BOTH arrays based on file_path
-            const fileToDelete = track.file_path;
-            masterLibraryData = masterLibraryData.filter(t => t.file_path !== fileToDelete);
-            libraryData = libraryData.filter(t => t.file_path !== fileToDelete);
-            renderVirtualList(); 
+    // Multi-select logic
+    if (e.ctrlKey || e.metaKey) {
+        if (selectedPaths.has(track.file_path)) {
+            selectedPaths.delete(track.file_path);
+        } else {
+            selectedPaths.add(track.file_path);
         }
-        return;
+    } else {
+        // Standard single select
+        selectedPaths.clear();
+        selectedPaths.add(track.file_path);
     }
-    // // NEW: Intercept clicks on missing tracks
-    // if (track.missing) {
-    //     // We only prompt if they clicked the row (not the delete button)
-    //     if (!e.target.classList.contains('remove-btn')) {
-    //         if (confirm(`The file for "${track.title}" cannot be found. It may have been moved or deleted.\n\nWould you like to locate it manually?`)) {
-                
-    //             const response = await window.pywebview.api.locate_missing_file(track.file_path);
-                
-    //             if (response.status === 'success') {
-    //                 // Update both our arrays with the new path
-    //                 const oldPath = track.file_path;
-    //                 track.file_path = response.new_path;
-    //                 track.missing = false;
-                    
-    //                 // Clear the old broken cover from cache
-    //                 delete coverCache[oldPath]; 
-                    
-    //                 renderVirtualList(); // Instantly visually heal the row
-    //             }
-    //         }
-    //     }
-    //     return; // Halt execution so it doesn't try to play a missing file
-    // }
-    // Handle Play Click
-    currentTrackIndex = trackIndex;
-    const coverSrc = await getTrackCover(track.file_path);
-    // UPDATED: Route manual clicks through the bouncer
-    await requestPlayback(trackIndex, 1, true); // true = isManualClick
-});
+    renderVirtualList();
+}
 
-// Right Click Context Menu via Delegation
-trackList.addEventListener('contextmenu', (e) => {
+// // SINGLE CLICK: Selection Engine (with Ctrl/Cmd support)
+// document.getElementById('track-list').addEventListener('click', (e) => {
+//     const row = e.target.closest('li');
+//     if (!row) return;
+
+//     const trackIndex = parseInt(row.dataset.index);
+//     const track = libraryData[trackIndex];
+
+//     // Multi-select logic
+//     if (e.ctrlKey || e.metaKey) {
+//         if (selectedPaths.has(track.file_path)) {
+//             selectedPaths.delete(track.file_path);
+//         } else {
+//             selectedPaths.add(track.file_path);
+//         }
+//     } else {
+//         // Standard single select
+//         selectedPaths.clear();
+//         selectedPaths.add(track.file_path);
+//     }
+    
+//     renderVirtualList();
+// });
+
+// // DOUBLE CLICK: Playback Engine
+// document.getElementById('track-list').addEventListener('dblclick', async (e) => {
+//     console.log("double clicked!")
+//     const row = e.target.closest('li');
+//     if (!row) return;
+
+//     // Clear user text-selection that happens accidentally when double-clicking
+//     window.getSelection().removeAllRanges(); 
+
+//     const trackIndex = parseInt(row.dataset.index);
+//     await requestPlayback(trackIndex, 1, true); // Send to your bouncer!
+// });
+
+// Show Menu on Right-Click
+document.getElementById('track-list').addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const row = e.target.closest('li');
-    if (!row) return;
+    
+    if (row) {
+        const trackIndex = parseInt(row.dataset.index);
+        const track = libraryData[trackIndex];
+        
+        // If the user right-clicks an unselected row, select ONLY that row
+        if (!selectedPaths.has(track.file_path)) {
+            selectedPaths.clear();
+            selectedPaths.add(track.file_path);
+            renderVirtualList();
+        }
 
-    trackBeingEdited = libraryData[parseInt(row.dataset.index)];
-    contextMenu.style.left = `${e.pageX}px`;
-    contextMenu.style.top = `${e.pageY}px`;
-    contextMenu.classList.remove('hidden');
+        // Position and show menu
+        contextMenu.style.left = `${e.pageX}px`;
+        contextMenu.style.top = `${e.pageY}px`;
+        contextMenu.classList.remove('hidden');
+    }
 });
+
+// Hide menu when clicking elsewhere
+document.addEventListener('click', () => {
+    contextMenu.classList.add('hidden');
+});
+
+// Bulk Remove Action
+document.getElementById('ctx-remove').addEventListener('click', async () => {
+    const count = selectedPaths.size;
+    if (count === 0) return;
+
+    if (confirm(`Are you sure you want to remove ${count} track(s) from your library?\n\n(This will not delete the actual files from your hard drive).`)) {
+        
+        const pathsArray = Array.from(selectedPaths);
+        const result = await window.pywebview.api.remove_tracks(pathsArray);
+        
+        if (result.status === 'success') {
+            // Remove from Master and Display arrays
+            masterLibraryData = masterLibraryData.filter(t => !selectedPaths.has(t.file_path));
+            libraryData = libraryData.filter(t => !selectedPaths.has(t.file_path));
+            
+            selectedPaths.clear();
+            renderVirtualList();
+        }
+    }
+});
+
+// Bulk Edit Action
+document.getElementById('ctx-edit').addEventListener('click', () => {
+    const pathsArray = Array.from(selectedPaths);
+    if (pathsArray.length === 0) return;
+    
+    // OPEN YOUR METADATA MODAL HERE. 
+    // You will pass 'pathsArray' to your modal instead of a single track.
+    // If pathsArray.length > 1, show placeholder text like "(Multiple Values)" 
+    // in the input fields. When the user saves, apply ONLY the altered fields 
+    // to every file path in the array!
+    console.log("Opening edit modal for:", pathsArray);
+});
+
 
 
 // --- NEW: Live Search Logic ---
@@ -291,8 +375,6 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     } else {
         // Split the search query into an array of individual words
         const searchTerms = query.split(/\s+/);
-
-        console.log(searchTerms);
         
         libraryData = masterLibraryData.filter(track => {
             // Combine all searchable fields into one giant string for easy checking
@@ -526,17 +608,17 @@ document.addEventListener('click', () => {
 });
 
 
-// Show the Modal
-document.getElementById('menu-edit').addEventListener('click', () => {
-    if (!trackBeingEdited) return;
+// // Show the Modal
+// document.getElementById('menu-edit').addEventListener('click', () => {
+//     if (!trackBeingEdited) return;
     
-    // Pre-fill the inputs
-    document.getElementById('edit-title').value = trackBeingEdited.title;
-    document.getElementById('edit-artist').value = trackBeingEdited.artist;
-    document.getElementById('edit-year').value = trackBeingEdited.year;
+//     // Pre-fill the inputs
+//     document.getElementById('edit-title').value = trackBeingEdited.title;
+//     document.getElementById('edit-artist').value = trackBeingEdited.artist;
+//     document.getElementById('edit-year').value = trackBeingEdited.year;
     
-    editModal.classList.remove('hidden');
-});
+//     editModal.classList.remove('hidden');
+// });
 
 // Cancel Button
 document.getElementById('cancel-edit-btn').addEventListener('click', () => {
@@ -584,33 +666,6 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     document.getElementById('save-edit-btn').innerText = "Save to File";
     editModal.classList.add('hidden');
     trackBeingEdited = null;
-});
-
-document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    
-    if (query === '') {
-        // If search is empty, restore the full library
-        libraryData = [...masterLibraryData];
-    } else {
-        // Filter the master list based on Title, Artist, or Album
-        libraryData = masterLibraryData.filter(track => {
-            // Safely handle null/undefined fields just in case
-            const title = (track.title || '').toLowerCase();
-            const artist = (track.artist || '').toLowerCase();
-            const album = (track.album || '').toLowerCase();
-            
-            return title.includes(query) || artist.includes(query) || album.includes(query);
-        });
-    }
-    
-    // CRITICAL: Reset scroll position to top. 
-    // If you are scrolled down to song #4000 and search for a single track, 
-    // the virtual scroller will render blank space unless we snap back to the top!
-    document.getElementById('track-list-container').scrollTop = 0;
-    
-    // Re-draw the screen
-    renderVirtualList();
 });
 
 // --- NEW: Universal Cover Art Fetcher ---

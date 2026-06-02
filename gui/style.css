@@ -309,7 +309,7 @@ input[type="range"] {
 }
 
 /* Right-Click Menu */
-#context-menu {
+/* #context-menu {
   position: absolute;
   background-color: var(--bg-panel);
   border: 1px solid var(--border-color);
@@ -330,6 +330,31 @@ input[type="range"] {
 
 #context-menu div:hover {
   background-color: var(--bg-hover);
+} */
+
+#context-menu {
+    position: absolute;
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    padding: 5px 0;
+    z-index: 1000;
+    min-width: 160px;
+}
+
+.context-item {
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.context-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.delete-text {
+    color: var(--text-error, #ff5555);
 }
 
 /* Modal Overlay */
@@ -481,3 +506,9 @@ input[type="range"] {
     text-decoration: none;
     display: inline-block;
 }
+
+.track-selected {
+    background-color: var(--bg-hover) !important;
+    border-left: 3px solid var(--accent);
+}
+

@@ -80,9 +80,12 @@
         />
       </div>
     </footer>
-    
+
     <div id="context-menu" class="hidden">
-      <div id="menu-edit">✏️ Edit Info</div>
+      <div class="context-item" id="ctx-edit">Edit Metadata</div>
+      <div class="context-item delete-text" id="ctx-remove">
+        Remove from Library
+      </div>
     </div>
 
     <div id="edit-modal" class="modal hidden">
@@ -112,13 +115,13 @@
     </div>
 
     <div id="import-progress-container" class="hidden">
-        <div class="progress-header">
-            <span>Importing Music...</span>
-            <span id="import-count">0 / 0</span>
-        </div>
-        <div class="progress-bar-bg">
-            <div id="import-progress-fill"></div>
-        </div>
+      <div class="progress-header">
+        <span>Importing Music...</span>
+        <span id="import-count">0 / 0</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="import-progress-fill"></div>
+      </div>
     </div>
 
     <script src="main.js"></script>
