@@ -8,8 +8,42 @@
   </head>
   <body>
     <header class="app-header">
-      <input type="text" id="search-input" placeholder="Search library..." />
-      <button id="add-music-btn">Add Music</button>
+      <div class="header-left">
+        <button id="prev-btn" class="icon-btn" title="Previous Track">⏮</button>
+        <button id="play-pause-btn" title="Play/Pause">▶ Play</button>
+        <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+        <div class="volume-container">
+          <button id="normalize-btn" class="icon-btn" title="Toggle Volume Normalization">🔊</button>
+          <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="1" />
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="center-now-playing">
+          <img
+            id="np-cover"
+            src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>"
+            alt="Cover"
+          />
+          <div class="np-info">
+            <span id="np-title">No track selected</span>
+            <span id="np-artist">-</span>
+          </div>
+          <div class="center-modes">
+            <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
+            <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
+          </div>
+        </div>
+        <div class="progress-container">
+          <span id="current-time">0:00</span>
+          <input type="range" id="progress-bar" value="0" min="0" max="100" step="1" />
+          <span id="total-time">0:00</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <input type="text" id="search-input" placeholder="Search library..." spellcheck="false" />
+      </div>
     </header>
 
     <main class="library-container">
@@ -27,65 +61,14 @@
       </div>
     </main>
 
-    <footer class="player-bar">
-      <div class="now-playing">
-        <img
-          id="np-cover"
-          src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>"
-          alt="Cover"
-        />
-        <div class="np-info">
-          <div id="np-title">No track selected</div>
-          <div id="np-artist">-</div>
-        </div>
-      </div>
-
-      <div class="player-center">
-        <div class="player-controls">
-          <button id="shuffle-btn" class="icon-btn">🔀</button>
-          <button id="prev-btn" class="icon-btn">⏮</button>
-          <button id="play-pause-btn">▶ Play</button>
-          <button id="next-btn" class="icon-btn">⏭</button>
-          <button id="repeat-btn" class="icon-btn">🔁</button>
-        </div>
-        <div class="progress-container">
-          <span id="current-time">0:00</span>
-          <input
-            type="range"
-            id="progress-bar"
-            value="0"
-            min="0"
-            max="100"
-            step="1"
-          />
-          <span id="total-time">0:00</span>
-        </div>
-      </div>
-
-      <div class="volume-container">
-        <button
-          id="normalize-btn"
-          class="icon-btn"
-          title="Toggle Volume Normalization"
-        >
-          🔊
-        </button>
-        <input
-          type="range"
-          id="volume-bar"
-          min="0"
-          max="1"
-          step="0.01"
-          value="1"
-        />
-      </div>
+    <footer class="status-bar">
+      <button id="add-music-btn">Add Music</button>
+      <div id="status-text">0 tracks in library</div>
     </footer>
 
     <div id="context-menu" class="hidden">
       <div class="context-item" id="ctx-edit">Edit Metadata</div>
-      <div class="context-item delete-text" id="ctx-remove">
-        Remove from Library
-      </div>
+      <div class="context-item delete-text" id="ctx-remove">Remove from Library</div>
     </div>
 
     <div id="edit-modal-overlay" class="hidden">

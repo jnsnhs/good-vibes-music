@@ -1,13 +1,10 @@
 /* =========================================
    1. THEME VARIABLES (OS Auto-Detect)
    ========================================= */
-
 :root {
-  /* COLORS */
   --green: #1db954;
   --purple: #a855f7;
   --purple-hover: #c084fc;
-  /* DEFAULT: Dark Theme Palette */
   --bg-main: #121212;
   --bg-panel: #181818;
   --bg-hover: #2a2a2a;
@@ -15,13 +12,12 @@
   --text-main: #ffffff;
   --text-secondary: #b3b3b3;
   --text-muted: #888888;
-  --accent: var(--green); /* Keep the classic green */
+  --accent: var(--green);
   --border-color: #333333;
   --border-light: #2a2a2a;
   --danger: #ff4d4d;
 }
 
-/* OVERRIDE: If the OS is in Light Mode, swap the colors */
 @media (prefers-color-scheme: light) {
   :root {
     --bg-main: #f5f5f7;
@@ -31,7 +27,7 @@
     --text-main: #1d1d1f;
     --text-secondary: #515154;
     --text-muted: #86868b;
-    --accent: var(--green); /* Keep the classic green */
+    --accent: var(--green);
     --border-color: #d2d2d7;
     --border-light: #e5e5ea;
     --danger: #ff3b30;
@@ -42,10 +38,7 @@
    2. GLOBAL STYLES
    ========================================= */
 body {
-  /* Added modern system fonts */
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-main);
   color: var(--text-main);
   margin: 0;
@@ -53,39 +46,125 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  transition:
-    background-color 0.3s,
-    color 0.3s; /* Smooth transition if OS changes */
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* =========================================
-   3. HEADER & SEARCH
+   3. UNIFIED TOP BAR
    ========================================= */
 .app-header {
   background-color: var(--bg-panel);
-  padding: 15px 20px;
-  display: flex;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
   align-items: center;
-  justify-content: space-between;
   border-bottom: 1px solid var(--border-color);
+  height: 75px;
+  box-sizing: border-box;
   transition: background-color 0.3s;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#play-pause-btn {
+  min-width: 80px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.volume-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 5px;
+}
+
+#volume-bar {
+  width: 70px;
+}
+
+.header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.center-now-playing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 5px;
+  width: 100%;
+}
+
+#np-cover {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.np-info {
+  display: flex;
+  flex-direction: column;
+  max-width: 200px;
+  line-height: 1.2;
+}
+
+#np-title {
+  color: var(--text-main);
+  font-weight: bold;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#np-artist {
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.center-modes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 500px;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.header-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
 #search-input {
-  flex: 1;
-  max-width: 400px;
-  margin: 0 20px;
-  padding: 10px 15px;
+  width: 100%;
+  max-width: 220px;
+  padding: 6px 14px;
   border-radius: 20px;
   border: 1px solid var(--border-color);
   background-color: var(--bg-input);
   color: var(--text-main);
   outline: none;
-  font-size: 14px;
-  transition:
-    border-color 0.2s,
-    background-color 0.3s,
-    color 0.3s;
+  font-size: 13px;
+  transition: border-color 0.2s, background-color 0.3s, color 0.3s;
 }
 
 #search-input:focus {
@@ -100,7 +179,7 @@ button {
   background-color: var(--accent);
   color: white;
   border: none;
-  padding: 8px 15px;
+  padding: 6px 14px;
   border-radius: 20px;
   cursor: pointer;
   font-weight: bold;
@@ -113,8 +192,8 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* This kills the outer double scrollbar! */
-  padding: 0; /* Removing padding so the scrollbar hits the far right edge cleanly */
+  overflow: hidden;
+  padding: 0;
 }
 
 #track-list {
@@ -125,15 +204,12 @@ button {
 }
 
 #track-list li {
-  position: absolute; /* Crucial for virtualization */
+  position: absolute;
   width: 100%;
-  height: 52px; /* Strict row height for math calculations */
+  height: 52px;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 35px minmax(0, 3fr) minmax(0, 2fr) minmax(
-      0,
-      2fr
-    ) 50px 50px 30px;
+  grid-template-columns: 35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 50px 50px 30px;
   align-items: center;
   gap: 15px;
   padding: 0 20px;
@@ -184,106 +260,11 @@ button {
   background: none;
 }
 
-/* =========================================
-   5. PLAYER BAR (FOOTER)
-   ========================================= */
-.player-bar {
-  background-color: var(--bg-panel);
-  border-top: 1px solid var(--border-color);
-  padding: 15px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 90px;
-  transition: background-color 0.3s;
-}
-
-.now-playing {
-  display: flex;
-  align-items: center;
-  width: 30%;
-}
-#np-cover {
-  width: 56px;
-  height: 56px;
-  border-radius: 4px;
-  margin-right: 15px;
-}
-
-.np-info {
-  display: flex;
-  flex-direction: column;
-}
-#np-title {
-  color: var(--text-main);
-  font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-#np-artist {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.player-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 40%;
-}
-.player-controls {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 10px;
-}
-
-.icon-btn {
-  background: none;
-  color: var(--text-secondary);
-  font-size: 18px;
-  padding: 0;
-}
-.icon-btn:hover {
-  color: var(--text-main);
-  background: none;
-}
-.icon-btn.active {
-  color: var(--accent);
-}
-
-.progress-container {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 10px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-input[type="range"] {
-  flex: 1;
-  accent-color: var(
-    --accent
-  ); /* Uses native browser styling tinted with our green */
-}
-
-.volume-container {
-  display: flex;
-  align-items: center;
-  width: 30%;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 .list-header {
   display: grid;
-  grid-template-columns: 35px minmax(0, 3fr) minmax(0, 2fr) minmax(
-      0,
-      2fr
-    ) 50px 50px 30px;
+  grid-template-columns: 35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 50px 50px 30px;
   gap: 15px;
-  padding: 15px 20px 10px 20px;
+  padding: 12px 20px 8px 20px;
   border-bottom: 2px solid var(--border-color);
   font-weight: bold;
   color: var(--text-secondary);
@@ -301,36 +282,60 @@ input[type="range"] {
 }
 
 /* =========================================
+   5. BOTTOM STATUS BAR
+   ========================================= */
+.status-bar {
+  background-color: var(--bg-panel);
+  border-top: 1px solid var(--border-color);
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 38px;
+  box-sizing: border-box;
+  transition: background-color 0.3s;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+#add-music-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.icon-btn {
+  background: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  padding: 4px;
+}
+.icon-btn:hover {
+  color: var(--text-main);
+  background: none;
+}
+.icon-btn.active {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+#track-list-container {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* =========================================
    6. CONTEXT MENU & MODALS
    ========================================= */
-
 .hidden {
   display: none !important;
 }
-
-/* Right-Click Menu */
-/* #context-menu {
-  position: absolute;
-  background-color: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  padding: 5px 0;
-  z-index: 1000;
-  min-width: 150px;
-}
-
-#context-menu div {
-  padding: 10px 15px;
-  cursor: pointer;
-  color: var(--text-main);
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-#context-menu div:hover {
-  background-color: var(--bg-hover);
-} */
 
 #context-menu {
     position: absolute;
@@ -356,167 +361,6 @@ input[type="range"] {
 .delete-text {
     color: var(--text-error, #ff5555);
 }
-
-/* Modal Overlay */
-.modal {
-  position: fixed;
-  inset: 0; /* Stretches to all 4 corners */
-  background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-}
-
-.modal-content {
-  background-color: var(--bg-panel);
-  padding: 25px;
-  border-radius: 12px;
-  width: 350px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.modal-content h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
-}
-
-.input-group {
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column;
-}
-
-.input-group label {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
-
-.input-group input {
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 10px;
-  border-radius: 6px;
-  outline: none;
-}
-
-.input-group input:focus {
-  border-color: var(--accent);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 25px;
-}
-
-.secondary-btn {
-  background-color: var(--bg-input);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-}
-.secondary-btn:hover {
-  background-color: var(--bg-hover);
-}
-
-#track-list-container {
-  flex: 1;
-  overflow-y: auto;
-  position: relative;
-}
-
-/* =========================================
-   7. CUSTOM OS-AWARE SCROLLBARS
-   ========================================= */
-
-/* The overall width of the scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
-}
-
-/* The track (background) of the scrollbar */
-::-webkit-scrollbar-track {
-  background: var(--bg-main);
-}
-
-/* The draggable handle */
-::-webkit-scrollbar-thumb {
-  background-color: var(--border-color);
-  border-radius: 6px;
-  border: 3px solid var(--bg-main); /* Creates a neat padding effect */
-}
-
-/* Hover effect for the handle */
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--text-muted);
-}
-
-/* =========================================
-   8. PROGRESS BAR OVERLAY
-   ========================================= */
-
-#import-progress-container {
-  background-color: var(--bg-hover);
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  font-weight: bold;
-}
-
-.progress-bar-bg {
-  width: 100%;
-  height: 6px;
-  background-color: var(--bg-input);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-#import-progress-fill {
-  width: 0%;
-  height: 100%;
-  background-color: var(--accent);
-  transition: width 0.3s ease;
-}
-
-/* =========================================
-   9. MISSING FILE STATES
-   ========================================= */
-
-.track-missing {
-    opacity: 0.4;
-    cursor: default !important;
-}
-
-.track-missing .track-title {
-    color: var(--text-error, #ff5555);
-    text-decoration: line-through;
-}
-
-.missing-icon {
-    margin-right: 5px;
-    font-style: normal;
-    text-decoration: none;
-    display: inline-block;
-}
-
-.track-selected {
-    background-color: var(--bg-hover) !important;
-    border-left: 3px solid var(--accent);
-}
-
-/* =========================================
-   10. MODAL DIALOG
-   ========================================= */
 
 #edit-modal-overlay {
     position: fixed;
@@ -581,19 +425,94 @@ input[type="range"] {
     gap: 10px;
 }
 
+.secondary-btn {
+  background-color: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+.secondary-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+/* =========================================
+   7. CUSTOM OS-AWARE SCROLLBARS
+   ========================================= */
+::-webkit-scrollbar {
+  width: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 6px;
+  border: 3px solid var(--bg-main);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+}
+
+/* =========================================
+   8. PROGRESS BAR OVERLAY
+   ========================================= */
+#import-progress-container {
+  background-color: var(--bg-hover);
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+.progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#import-progress-fill {
+  width: 0%;
+  height: 100%;
+  background-color: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* =========================================
+   9. MISSING FILE STATES
+   ========================================= */
+.track-missing {
+    opacity: 0.4;
+    cursor: default !important;
+}
+.track-missing .track-title {
+    color: var(--text-error, #ff5555);
+    text-decoration: line-through;
+}
+.missing-icon {
+    margin-right: 5px;
+    font-style: normal;
+    text-decoration: none;
+    display: inline-block;
+}
+.track-selected {
+    background-color: var(--bg-hover) !important;
+    border-left: 3px solid var(--accent);
+}
+
 /* =========================================
    11. NOW PLAYING STATE
    ========================================= */
 .track-playing {
-    background-color: rgba(29, 185, 84, 0.1) !important; /* Subtle tint using your accent color */
+    background-color: rgba(29, 185, 84, 0.1) !important;
     color: var(--accent) !important;
     font-weight: bold;
 }
-
-.track-playing .track-title {
-    color: var(--accent) !important;
-}
-
+.track-playing .track-title,
 .track-playing .track-artist,
 .track-playing .track-album {
     color: var(--accent) !important;
