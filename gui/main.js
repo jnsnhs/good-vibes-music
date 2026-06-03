@@ -21,6 +21,16 @@ let currentView = 'list'; // NEW: Tracks 'list' or 'grid'
 let gridAlbums = [];      // NEW: Holds parsed album data
 let playbackContext = { type: 'list', key: null }; // Tracks 'list' or 'album' context
 
+// --- Global Context Menu Suppression ---
+document.addEventListener('contextmenu', (e) => {
+    // Prevent the default browser context menu everywhere
+    e.preventDefault();
+    
+    // Optional: If you want to show a custom context menu for empty areas
+    // or specific elements, you can handle that logic here.
+    // Otherwise, this stops it globally.
+});
+
 // Dynamic Status Bar Count Handler
 function updateStatusCount() {
     const statusText = document.getElementById('status-text');
