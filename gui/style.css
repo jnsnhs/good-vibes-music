@@ -309,14 +309,16 @@ button {
   color: var(--text-secondary);
   font-size: 16px;
   padding: 4px;
+  opacity: 0.5;
 }
 .icon-btn:hover {
   color: var(--text-main);
   background: none;
+  opacity: 0.75;
 }
 .icon-btn.active {
+  opacity: 1.0;
   color: var(--accent);
-  border: 1px solid var(--accent);
 }
 
 input[type="range"] {

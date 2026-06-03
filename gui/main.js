@@ -5,7 +5,7 @@ let masterLibraryData = [];
 let libraryData = [];       
 let currentTrackIndex = -1; 
 let isShuffle = false;
-let isRepeat = false;
+let repeatMode = 'off';
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
 
 let selectedPaths = new Set(); 
@@ -316,44 +316,58 @@ document.getElementById('shuffle-btn').addEventListener('click', (e) => {
     e.target.classList.toggle('active', isShuffle);
 });
 
-document.getElementById('repeat-btn').addEventListener('click', (e) => {
-    isRepeat = !isRepeat;
-    e.target.classList.toggle('active', isRepeat);
+const repeatBtn = document.getElementById('repeat-btn');
+repeatBtn.addEventListener('click', () => {
+    if (repeatMode === 'off') {
+        // State 1: Repeat All
+        repeatMode = 'all';
+        repeatBtn.classList.add('active');
+        repeatBtn.innerText = '🔁';
+        repeatBtn.title = 'Repeat: All';
+    } else if (repeatMode === 'all') {
+        // State 2: Repeat One (Uses the standard '1' repeat emoji)
+        repeatMode = 'one';
+        repeatBtn.classList.add('active');
+        repeatBtn.innerText = '🔂'; 
+        repeatBtn.title = 'Repeat: One';
+    } else {
+        // State 3: Off
+        repeatMode = 'off';
+        repeatBtn.classList.remove('active');
+        repeatBtn.innerText = '🔁';
+        repeatBtn.title = 'Repeat: Off';
+    }
 });
 
-function playNext() {
-    if (libraryData.length === 0 || currentTrackIndex === -1) return;
-    if (isRepeat) {
+document.getElementById('next-btn').addEventListener('click', async () => {
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1, false);
+    if (targetIndex !== -1) await requestPlayback(targetIndex, 1, false);
+});
+
+document.getElementById('prev-btn').addEventListener('click', async () => {
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, -1, false);
+    if (targetIndex !== -1) await requestPlayback(targetIndex, -1, false);
+});
+
+audioPlayer.addEventListener('ended', async () => {
+    // 1. Intercept "Repeat One" immediately
+    if (repeatMode === 'one') {
         audioPlayer.currentTime = 0;
         audioPlayer.play();
         return;
     }
-    if (isShuffle) {
-        let randomIndex = currentTrackIndex;
-        while (randomIndex === currentTrackIndex && libraryData.length > 1) {
-            randomIndex = Math.floor(Math.random() * libraryData.length);
-        }
-        currentTrackIndex = randomIndex;
+
+    // 2. Otherwise, hunt for the next track (passing true for isAutoPlay)
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1, true);
+    
+    if (targetIndex !== -1) {
+        await requestPlayback(targetIndex, 1, false);
     } else {
-        currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
+        // 3. End of library reached and Repeat All is OFF. Reset the UI.
+        isPlaying = false;
+        document.getElementById('play-pause-btn').innerText = '▶ Play';
+        audioPlayer.currentTime = 0;
     }
-    const nextTrack = libraryData[currentTrackIndex];
-    playTrack(nextTrack, nextTrack.cover_base64 || placeholderImg);
-}
-
-document.getElementById('next-btn').addEventListener('click', async () => {
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    await requestPlayback(targetIndex, 1, false);
-});
-
-document.getElementById('prev-btn').addEventListener('click', async () => {
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, -1);
-    await requestPlayback(targetIndex, -1, false);
-});
-
-audioPlayer.addEventListener('ended', async () => {
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    await requestPlayback(targetIndex, 1, false);
 });
 
 function formatTime(seconds) {
@@ -438,15 +452,48 @@ async function getTrackCover(filePath) {
     return 'placeholder.png'; 
 }
 
-function getNextValidTrackIndex(startIndex, direction = 1) {
+// NEW: Added an 'isAutoPlay' flag so the player knows if a song ended naturally 
+// or if the user actively clicked the "Next" button.
+function getNextValidTrackIndex(startIndex, direction = 1, isAutoPlay = false) {
+    if (libraryData.length === 0) return -1;
+
+    // --- SHUFFLE LOGIC (Only applies when moving forward) ---
+    if (isShuffle && direction === 1) {
+        let attempts = 0;
+        while (attempts < libraryData.length) {
+            let randomIndex = Math.floor(Math.random() * libraryData.length);
+            if (!libraryData[randomIndex].missing && randomIndex !== startIndex) {
+                return randomIndex;
+            }
+            attempts++;
+        }
+        return startIndex; // Fallback if everything else is missing
+    }
+
+    // --- STANDARD SEQUENTIAL LOGIC ---
     let index = startIndex;
     let attempts = 0;
+
     while (attempts < libraryData.length) {
-        index = (index + direction + libraryData.length) % libraryData.length;
-        if (!libraryData[index].missing) { return index; }
+        index += direction;
+
+        // Handle boundaries
+        if (index >= libraryData.length) {
+            // If the song just ended naturally and Repeat All is off, STOP playing.
+            if (isAutoPlay && repeatMode === 'off') {
+                return -1; 
+            }
+            index = 0; // Otherwise, wrap around to the start
+        } else if (index < 0) {
+            index = libraryData.length - 1; // Wrap around to the end when hitting Previous
+        }
+
+        if (!libraryData[index].missing) {
+            return index;
+        }
         attempts++;
     }
-    return -1; 
+    return -1; // Everything is missing
 }
 
 async function requestPlayback(targetIndex, direction = 1, isManualClick = false) {
