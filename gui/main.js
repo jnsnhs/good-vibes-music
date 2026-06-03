@@ -19,6 +19,7 @@ let isNormalized = false;
 
 let currentView = 'list'; // NEW: Tracks 'list' or 'grid'
 let gridAlbums = [];      // NEW: Holds parsed album data
+let playbackContext = { type: 'list', key: null }; // Tracks 'list' or 'album' context
 
 // Dynamic Status Bar Count Handler
 function updateStatusCount() {
@@ -203,6 +204,10 @@ async function doubleClickOnTrack(e) {
     if (!row) return;
     const trackIndex = parseInt(row.dataset.index);
     window.getSelection().removeAllRanges(); 
+    
+    // NEW: Set context back to the full list
+    playbackContext = { type: 'list', key: null };
+    
     await requestPlayback(trackIndex, 1, true);
 }
 
@@ -267,7 +272,13 @@ document.getElementById('ctx-remove').addEventListener('click', async () => {
             libraryData = libraryData.filter(t => !selectedPaths.has(t.file_path));
             selectedPaths.clear();
             updateStatusCount();
-            renderVirtualList();
+            
+            // NEW: Update the correct view
+            if (currentView === 'list') {
+                renderVirtualList();
+            } else {
+                renderAlbumGrid();
+            }
         }
     }
 });
@@ -289,7 +300,19 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 
 function playTrack(track, coverSrc) {
     currentPlayingPath = track.file_path;
+    
+    // Always render list so it's accurate when switching back
     renderVirtualList();
+    
+    // NEW: Update grid expansion highlights dynamically without closing the album!
+    const expandedList = document.getElementById('expanded-track-list');
+    if (expandedList) {
+        Array.from(expandedList.children).forEach(li => {
+            if (li.dataset.filepath === currentPlayingPath) li.classList.add('track-playing');
+            else li.classList.remove('track-playing');
+        });
+    }
+
     initWebAudio(); 
     const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
     
@@ -457,46 +480,64 @@ async function getTrackCover(filePath) {
 
 // NEW: Added an 'isAutoPlay' flag so the player knows if a song ended naturally 
 // or if the user actively clicked the "Next" button.
+// --- UPDATED: Context-Aware Index Hunter ---
 function getNextValidTrackIndex(startIndex, direction = 1, isAutoPlay = false) {
     if (libraryData.length === 0) return -1;
 
-    // --- SHUFFLE LOGIC (Only applies when moving forward) ---
+    // 1. Define the "pool" of tracks we are allowed to play from
+    let pool = [];
+    if (playbackContext.type === 'album') {
+        const album = gridAlbums.find(a => a.key === playbackContext.key);
+        if (album) {
+            pool = album.tracks.map(t => t.globalIndex); // Only use tracks from this album
+        } else {
+            pool = libraryData.map((_, i) => i); // Fallback to list
+        }
+    } else {
+        pool = libraryData.map((_, i) => i); // Standard list context
+    }
+
+    // 2. Find where we currently are in the allowed pool
+    let poolIndex = pool.indexOf(startIndex);
+    if (poolIndex === -1) poolIndex = 0;
+
+    // --- SHUFFLE LOGIC ---
     if (isShuffle && direction === 1) {
         let attempts = 0;
-        while (attempts < libraryData.length) {
-            let randomIndex = Math.floor(Math.random() * libraryData.length);
-            if (!libraryData[randomIndex].missing && randomIndex !== startIndex) {
-                return randomIndex;
+        while (attempts < pool.length) {
+            let randomPoolIndex = Math.floor(Math.random() * pool.length);
+            let targetGlobalIndex = pool[randomPoolIndex];
+            if (!libraryData[targetGlobalIndex].missing && targetGlobalIndex !== startIndex) {
+                return targetGlobalIndex;
             }
             attempts++;
         }
-        return startIndex; // Fallback if everything else is missing
+        return startIndex; 
     }
 
-    // --- STANDARD SEQUENTIAL LOGIC ---
-    let index = startIndex;
+    // --- SEQUENTIAL LOGIC ---
     let attempts = 0;
+    while (attempts < pool.length) {
+        poolIndex += direction;
 
-    while (attempts < libraryData.length) {
-        index += direction;
-
-        // Handle boundaries
-        if (index >= libraryData.length) {
-            // If the song just ended naturally and Repeat All is off, STOP playing.
+        // Boundaries
+        if (poolIndex >= pool.length) {
+            // STOP playback if the context naturally ended and repeat is off
             if (isAutoPlay && repeatMode === 'off') {
                 return -1; 
             }
-            index = 0; // Otherwise, wrap around to the start
-        } else if (index < 0) {
-            index = libraryData.length - 1; // Wrap around to the end when hitting Previous
+            poolIndex = 0; // Wrap around to start of pool
+        } else if (poolIndex < 0) {
+            poolIndex = pool.length - 1; // Wrap around to end
         }
 
-        if (!libraryData[index].missing) {
-            return index;
+        let targetGlobalIndex = pool[poolIndex];
+        if (libraryData[targetGlobalIndex] && !libraryData[targetGlobalIndex].missing) {
+            return targetGlobalIndex;
         }
         attempts++;
     }
-    return -1; // Everything is missing
+    return -1;
 }
 
 async function requestPlayback(targetIndex, direction = 1, isManualClick = false) {
@@ -668,9 +709,10 @@ function processAlbums() {
         
         if (!albumMap.has(key)) {
             albumMap.set(key, {
+                key: key, // NEW: Store the unique key
                 title: track.album || 'Unknown Album',
                 artist: track.album_artist || track.artist || 'Unknown Artist',
-                coverPath: track.file_path, // Base cover path
+                coverPath: track.file_path, 
                 tracks: []
             });
         }
@@ -691,6 +733,8 @@ function processAlbums() {
             return trackA - trackB;
         });
     });
+
+    
     
     gridAlbums = Array.from(albumMap.values());
 }
@@ -813,15 +857,16 @@ function openExpandedAlbum(albumData, cardElement) {
         document.getElementById('expanded-highres-cover').src = src;
     });
 
-    // Wire up clicks! We reuse our existing single/double click functions by passing a mocked event
+    // --- UPDATED: Wire up Clicks and Context Menu ---
     const expandedList = document.getElementById('expanded-track-list');
     
+    // Left & Double Clicks
     expandedList.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         if (!li) return;
         
         if (!doubleClickOnTrackPossible) {
-            singleClickOnTrack(e); // This inherently looks for closest('li').dataset.index!
+            singleClickOnTrack(e); 
             
             // Re-render the inner list to show the selection highlight
             Array.from(expandedList.children).forEach(child => {
@@ -832,10 +877,35 @@ function openExpandedAlbum(albumData, cardElement) {
             doubleClickOnTrackPossible = true;
             setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
         } else {
-            // Double click caught! Route to the bouncer using the global index!
             window.getSelection().removeAllRanges(); 
+            // NEW: Set the playback context to THIS album!
+            playbackContext = { type: 'album', key: albumData.key };
             requestPlayback(parseInt(li.dataset.index), 1, true);
         }    
+    });
+
+    // NEW: Right-Click Context Menu in Grid
+    expandedList.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const li = e.target.closest('li');
+        if (li) {
+            const trackIndex = parseInt(li.dataset.index);
+            const track = libraryData[trackIndex];
+            
+            if (!selectedPaths.has(track.file_path)) {
+                selectedPaths.clear();
+                selectedPaths.add(track.file_path);
+                
+                Array.from(expandedList.children).forEach(child => {
+                    if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
+                    else child.classList.remove('track-selected');
+                });
+            }
+
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+            contextMenu.classList.remove('hidden');
+        }
     });
     
     // Smooth scroll into view
