@@ -8,117 +8,143 @@
   </head>
   <body>
     <header class="app-header">
-      <input type="text" id="search-input" placeholder="Search library..." />
-      <button id="add-music-btn">Add Music</button>
-    </header>
-
-    <main class="library-container">
-      <div class="list-header" id="list-header">
-        <div class="col-cover"></div>
-        <div class="col-sortable" data-sort="title">Title</div>
-        <div class="col-sortable" data-sort="artist">Artist</div>
-        <div class="col-sortable" data-sort="album">Album</div>
-        <div class="col-sortable" data-sort="year">Year</div>
-        <div class="col-sortable" data-sort="duration">Time</div>
-        <div class="col-remove"></div>
-      </div>
-      <div id="track-list-container">
-        <ul id="track-list"></ul>
-      </div>
-    </main>
-
-    <footer class="player-bar">
-      <div class="now-playing">
-        <img
-          id="np-cover"
-          src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>"
-          alt="Cover"
-        />
-        <div class="np-info">
-          <div id="np-title">No track selected</div>
-          <div id="np-artist">-</div>
+      <div class="header-left">
+        <button id="prev-btn" class="icon-btn" title="Previous Track">⏮</button>
+        <button id="play-pause-btn" title="Play/Pause">▶ Play</button>
+        <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+        <div class="volume-container">
+          <button id="normalize-btn" class="icon-btn" title="Toggle Volume Normalization">🔊</button>
+          <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="1" />
         </div>
       </div>
 
-      <div class="player-center">
-        <div class="player-controls">
-          <button id="shuffle-btn" class="icon-btn">🔀</button>
-          <button id="prev-btn" class="icon-btn">⏮</button>
-          <button id="play-pause-btn">▶ Play</button>
-          <button id="next-btn" class="icon-btn">⏭</button>
-          <button id="repeat-btn" class="icon-btn">🔁</button>
+      <div class="header-center">
+        <div class="center-now-playing">
+          <img
+            id="np-cover"
+            src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>"
+            alt="Cover"
+          />
+          <div class="np-info">
+            <span id="np-title">No track selected</span>
+            <span id="np-artist">-</span>
+          </div>
+          <div class="center-modes">
+            <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
+            <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
+          </div>
         </div>
         <div class="progress-container">
           <span id="current-time">0:00</span>
-          <input
-            type="range"
-            id="progress-bar"
-            value="0"
-            min="0"
-            max="100"
-            step="1"
-          />
+          <input type="range" id="progress-bar" value="0" min="0" max="100" step="1" />
           <span id="total-time">0:00</span>
         </div>
       </div>
 
-      <div class="volume-container">
-        <button
-          id="normalize-btn"
-          class="icon-btn"
-          title="Toggle Volume Normalization"
-        >
-          🔊
-        </button>
-        <input
-          type="range"
-          id="volume-bar"
-          min="0"
-          max="1"
-          step="0.01"
-          value="1"
-        />
+      <div class="header-right">
+        <input type="text" id="search-input" placeholder="Search library..." spellcheck="false" />
+      </div>
+    </header>
+
+    <main class="library-container">
+      <div id="list-view-wrapper" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="list-header" id="list-header">
+          <div class="col-cover"></div>
+          <div class="col-sortable" data-sort="title">Title</div>
+          <div class="col-sortable" data-sort="artist">Artist</div>
+          <div class="col-sortable" data-sort="album">Album</div>
+          <div class="col-sortable" data-sort="year">Year</div>
+          <div class="col-sortable" data-sort="duration">Time</div>
+          <div class="col-remove"></div>
+        </div>
+        <div id="track-list-container">
+          <ul id="track-list"></ul>
+        </div>
+      </div>
+
+      <div id="grid-view-wrapper" class="hidden" style="height: 100%; overflow-y: auto;">
+        <div id="album-grid">
+            </div>
+      </div>
+    </main>
+
+    <footer class="status-bar">
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <button id="add-music-btn">Add Music</button>
+        <div id="status-text">0 tracks in library</div>
+      </div>
+      
+      <div class="view-toggles" style="display: flex; gap: 10px;">
+        <button id="toggle-list-btn" class="icon-btn active" title="Table View">📄</button>
+        <button id="toggle-grid-btn" class="icon-btn" title="Grid View">🔲</button>
       </div>
     </footer>
-    
+
     <div id="context-menu" class="hidden">
-      <div id="menu-edit">✏️ Edit Info</div>
+      <div class="context-item" id="ctx-edit">Edit Metadata</div>
+      <div class="context-item delete-text" id="ctx-remove">Remove from Library</div>
     </div>
 
-    <div id="edit-modal" class="modal hidden">
-      <div class="modal-content">
-        <h3>Edit Track Info</h3>
-
-        <div class="input-group">
-          <label>Title</label>
-          <input type="text" id="edit-title" />
+    <div id="edit-modal-overlay" class="hidden">
+        <div class="modal-content">
+            <h2>Edit Metadata</h2>
+            <div class="edit-grid">
+                <div class="input-group">
+                    <label>Title</label>
+                    <input type="text" id="edit-title">
+                </div>
+                <div class="input-group">
+                    <label>Artist</label>
+                    <input type="text" id="edit-artist">
+                </div>
+                <div class="input-group">
+                    <label>Album</label>
+                    <input type="text" id="edit-album">
+                </div>
+                <div class="input-group">
+                    <label>Album Artist</label>
+                    <input type="text" id="edit-album_artist">
+                </div>
+                <div class="input-group">
+                    <label>Genre</label>
+                    <input type="text" id="edit-genre">
+                </div>
+                <div class="input-group">
+                    <label>Year</label>
+                    <input type="text" id="edit-year">
+                </div>
+                <div class="input-group">
+                    <label>Track #</label>
+                    <input type="text" id="edit-track_num">
+                </div>
+                <div class="input-group">
+                    <label>Disc #</label>
+                    <input type="text" id="edit-disc_num">
+                </div>
+                <div class="input-group full-width">
+                    <label>Comments</label>
+                    <input type="text" id="edit-comments">
+                </div>
+                <div class="input-group full-width checkbox-group">
+                    <input type="checkbox" id="edit-compilation">
+                    <label for="edit-compilation">Part of a compilation</label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-cancel-edit" class="secondary-btn">Cancel</button>
+                <button id="btn-save-edit" class="primary-btn">Save Changes</button>
+            </div>
         </div>
-
-        <div class="input-group">
-          <label>Artist</label>
-          <input type="text" id="edit-artist" />
-        </div>
-
-        <div class="input-group">
-          <label>Year</label>
-          <input type="text" id="edit-year" />
-        </div>
-
-        <div class="modal-actions">
-          <button id="save-edit-btn">Save to File</button>
-          <button id="cancel-edit-btn" class="secondary-btn">Cancel</button>
-        </div>
-      </div>
     </div>
 
     <div id="import-progress-container" class="hidden">
-        <div class="progress-header">
-            <span>Importing Music...</span>
-            <span id="import-count">0 / 0</span>
-        </div>
-        <div class="progress-bar-bg">
-            <div id="import-progress-fill"></div>
-        </div>
+      <div class="progress-header">
+        <span>Importing Music...</span>
+        <span id="import-count">0 / 0</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="import-progress-fill"></div>
+      </div>
     </div>
 
     <script src="main.js"></script>

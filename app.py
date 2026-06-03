@@ -1,5 +1,6 @@
 import webview
 import sqlite3
+import music_tag
 import base64
 from mutagen._file import File
 import os
@@ -116,8 +117,14 @@ def init_db():
             title TEXT,
             artist TEXT,
             album TEXT,
-            year TEXT, 
+            year TEXT,
             duration TEXT,
+            album_artist TEXT,
+            genre TEXT,
+            track_num TEXT,
+            disc_num TEXT, 
+            compilation INTEGER,
+            comments TEXT,
             cover_base64 TEXT
         )
     ''')
@@ -160,7 +167,20 @@ class Api:
         conn = sqlite3.connect('library.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT file_path, title, artist, album, year, duration FROM tracks")
+        c.execute("""SELECT
+                  file_path,
+                  title,
+                  artist,
+                  album,
+                  year,
+                  duration,
+                  album_artist,
+                  genre,
+                  track_num,
+                  disc_num,
+                  compilation,
+                  comments
+            FROM tracks""")
         rows = c.fetchall()
         conn.close()
         tracks = []
@@ -260,7 +280,16 @@ class Api:
                 album = tag.album or "Unknown"
                 year = str(tag.year) if tag.year else ""
                 
-                # Convert duration to MM:SS
+                # --- NEW METADATA EXTRACTIONS ---
+                album_artist = tag.albumartist or ""
+                genre = tag.genre or ""
+                track_num = str(tag.track) if tag.track else ""
+                disc_num = str(tag.disc) if tag.disc else ""
+                comments = tag.comment or ""
+                
+                # Infer compilation status (1 for True, 0 for False)
+                is_compilation = 1 if album_artist.lower() in ['various artists', 'various'] else 0
+                
                 duration = time.strftime('%M:%S', time.gmtime(tag.duration or 0))
                 
                 # FIX 1: Process and encode the cover art
@@ -270,10 +299,13 @@ class Api:
                     cover_base64 = "data:image/jpeg;base64," + base64.b64encode(image_data).decode('utf-8')
                 
                 # FIX 1: Add cover_base64 back to the INSERT statement
+                # --- UPDATED INSERT STATEMENT ---
                 c.execute('''INSERT OR IGNORE INTO tracks 
-                             (file_path, title, artist, album, year, duration, cover_base64) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                          (file_path, title, artist, album, year, duration, cover_base64))
+                             (file_path, title, artist, album, year, duration, 
+                              album_artist, genre, track_num, disc_num, compilation, comments, cover_base64) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                          (file_path, title, artist, album, year, duration, 
+                           album_artist, genre, track_num, disc_num, is_compilation, comments, cover_base64))
                 
                 # FIX 2: c.rowcount will be 1 if a new row was added, and 0 if IGNORE triggered.
                 # We only send data back to the JavaScript GUI if it is genuinely a new track.
@@ -284,7 +316,13 @@ class Api:
                         "artist": artist,
                         "album": album,
                         "year": year,
-                        "duration": duration
+                        "duration": duration,
+                        "album_artist": album_artist,
+                        "genre": genre,
+                        "track_num": track_num,
+                        "disc_num": disc_num,
+                        "is_compilation": is_compilation,
+                        "comments": comments
                     })
             except Exception as e:
                 print(f"Error parsing {file_path}: {e}")
@@ -318,37 +356,79 @@ class Api:
         return {"status": "success"}
     
     # NEW: Write metadata to MP3/M4A and update database
-    def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
-        try:
-            # 1. Update the physical file
-            # easy=True gives us a unified interface for both MP3 and M4A files
-            audio = File(file_path, easy=True) 
-            if audio is None:
-                return {"status": "error", "message": "Unsupported file format."}
+    # def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
+    #     try:
+    #         # 1. Update the physical file
+    #         # easy=True gives us a unified interface for both MP3 and M4A files
+    #         audio = File(file_path, easy=True) 
+    #         if audio is None:
+    #             return {"status": "error", "message": "Unsupported file format."}
 
-            # Mutagen expects lists for values
-            audio['title'] = [new_title]
-            audio['artist'] = [new_artist]
-            audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
-            audio.save()
+    #         # Mutagen expects lists for values
+    #         audio['title'] = [new_title]
+    #         audio['artist'] = [new_artist]
+    #         audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
+    #         audio.save()
 
-            # 2. Update the SQLite Database
-            conn = sqlite3.connect('library.db')
-            c = conn.cursor()
-            c.execute('''
-                UPDATE tracks 
-                SET title = ?, artist = ?, year = ? 
-                WHERE file_path = ?
-            ''', (new_title, new_artist, str(new_year), file_path))
-            conn.commit()
-            conn.close()
+    #         # 2. Update the SQLite Database
+    #         conn = sqlite3.connect('library.db')
+    #         c = conn.cursor()
+    #         c.execute('''
+    #             UPDATE tracks 
+    #             SET title = ?, artist = ?, year = ? 
+    #             WHERE file_path = ?
+    #         ''', (new_title, new_artist, str(new_year), file_path))
+    #         conn.commit()
+    #         conn.close()
 
-            return {"status": "success"}
+    #         return {"status": "success"}
 
-        except Exception as e:
-            print(f"Error editing tag: {e}")
-            return {"status": "error", "message": str(e)}
+    #     except Exception as e:
+    #         print(f"Error editing tag: {e}")
+    #         return {"status": "error", "message": str(e)}
         
+    def update_metadata(self, file_paths, modified_data):
+
+        
+        # Map our database column names to music_tag's specific keys
+        tag_map = {
+            'title': 'title', 'artist': 'artist', 'album': 'album',
+            'year': 'year', 'album_artist': 'albumartist', 'genre': 'genre',
+            'track_num': 'tracknumber', 'disc_num': 'discnumber',
+            'compilation': 'compilation', 'comments': 'comment'
+        }
+
+        conn = sqlite3.connect('library.db')
+        c = conn.cursor()
+
+        try:
+            for path in file_paths:
+                # 1. Update the Physical Audio File
+                f = music_tag.load_file(path)
+                print(f)
+                for key, val in modified_data.items():
+                    if key in tag_map:
+                        f[tag_map[key]] = val  # type: ignore
+                f.save()  # type: ignore
+
+                # 2. Update the SQLite Database dynamically
+                # We only update the columns that were actually modified
+                set_clause = ", ".join([f"{k} = ?" for k in modified_data.keys()])
+                values = list(modified_data.values())
+                values.append(path) # Add path for the WHERE clause
+                
+                c.execute(f"UPDATE tracks SET {set_clause} WHERE file_path = ?", values)
+                
+            conn.commit()
+            status = "success"
+        except Exception as e:
+            print(f"Failed to edit metadata: {e}")
+            status = "error"
+            
+        conn.close()
+        return {"status": status}
+
+
     def check_file_exists(self, file_path):
         return os.path.exists(file_path)
     

@@ -1,61 +1,54 @@
 const audioPlayer = new Audio();
 audioPlayer.crossOrigin = "anonymous";
 let isPlaying = false;
-let masterLibraryData = []; // NEW: Holds the absolute truth of all 5,000+ songs
-let libraryData = [];       // What is currently visible (filtered/sorted)
+let masterLibraryData = []; 
+let libraryData = [];       
 let currentTrackIndex = -1; 
 let isShuffle = false;
-let isRepeat = false;
+let repeatMode = 'off';
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
 
-// --- NEW: WEB AUDIO API & NORMALIZATION ---
-
-// Assuming you have an audio element somewhere like:
-// const audioPlayer = new Audio(); or document.getElementById('audio-player');
-// (Make sure this variable matches whatever you named your HTML5 audio object)
+let selectedPaths = new Set(); 
+let lastClickedIndex = null;   
+let currentPlayingPath = null; 
 
 let audioCtx;
 let audioSource;
 let compressor;
 let isNormalized = false;
 
-function initWebAudio() {
-    // The AudioContext must be created after the user interacts with the page (e.g., clicking Play)
-    if (audioCtx) return; 
+let currentView = 'list'; // NEW: Tracks 'list' or 'grid'
+let gridAlbums = [];      // NEW: Holds parsed album data
 
-    // Create the audio context
+// Dynamic Status Bar Count Handler
+function updateStatusCount() {
+    const statusText = document.getElementById('status-text');
+    if (statusText) {
+        statusText.innerText = `${masterLibraryData.length.toLocaleString()} tracks in library`;
+    }
+}
+
+function initWebAudio() {
+    if (audioCtx) return; 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Create a source node from our HTML5 audio player
-    // IMPORTANT: Replace 'audioPlayer' with the actual variable name of your Audio object
     audioSource = audioCtx.createMediaElementSource(audioPlayer); 
-    
-    // Create the Dynamics Compressor
     compressor = audioCtx.createDynamicsCompressor();
     
-    // Configure the compressor for heavy leveling (Normalization)
-    compressor.threshold.setValueAtTime(-50, audioCtx.currentTime); // Start compressing at very quiet levels
-    compressor.knee.setValueAtTime(40, audioCtx.currentTime);        // Smooth transition into compression
-    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);       // High ratio to aggressively squash loud peaks
-    compressor.attack.setValueAtTime(0, audioCtx.currentTime);       // React instantly
-    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);   // Release quickly
+    compressor.threshold.setValueAtTime(-50, audioCtx.currentTime); 
+    compressor.knee.setValueAtTime(40, audioCtx.currentTime);        
+    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);       
+    compressor.attack.setValueAtTime(0, audioCtx.currentTime);       
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);   
 
-    // Default routing: Source -> Speakers (Bypassed)
     audioSource.connect(audioCtx.destination);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Grab the button AFTER the DOM is fully loaded
     const normalizeBtn = document.getElementById('normalize-btn');
-
-    // Make sure the button actually exists before adding the listener
     if (normalizeBtn) {
         normalizeBtn.addEventListener('click', () => {
             initWebAudio();
-            
             isNormalized = !isNormalized;
-            
             audioSource.disconnect();
             
             if (isNormalized) {
@@ -75,11 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('pywebviewready', async () => {
     try {
         const tracks = await window.pywebview.api.get_library();
-        
-        // Store the master list, then make a shallow copy for display
         masterLibraryData = tracks;
         libraryData = [...masterLibraryData]; 
-        
+        updateStatusCount();
         renderVirtualList(); 
     } catch (e) {
         console.error("Failed to load library:", e);
@@ -87,7 +78,6 @@ window.addEventListener('pywebviewready', async () => {
 });
 
 const addMusicBtn = document.getElementById('add-music-btn');
-
 addMusicBtn.addEventListener('click', async () => {
     const response = await window.pywebview.api.add_music();
     
@@ -96,34 +86,24 @@ addMusicBtn.addEventListener('click', async () => {
         const fill = document.getElementById('import-progress-fill');
         const countText = document.getElementById('import-count');
         
-        // Lock the button & show progress bar
         addMusicBtn.disabled = true;
         addMusicBtn.style.opacity = '0.5';
         container.classList.remove('hidden');
         fill.style.width = '0%';
 
-        // Begin polling Python every 500ms
         const pollInterval = setInterval(async () => {
             const state = await window.pywebview.api.get_import_progress();
-            
-            // Update UI visuals
             countText.innerText = `${state.current} / ${state.total}`;
             const percentage = (state.current / state.total) * 100;
             fill.style.width = `${percentage}%`;
             
-            // Check if thread is completely finished
             if (!state.is_running && state.current === state.total) {
-                clearInterval(pollInterval); // Stop asking Python
-                
-                // Safely merge new tracks into our master list
+                clearInterval(pollInterval); 
                 if (state.new_tracks.length > 0) {
                     masterLibraryData.push(...state.new_tracks);
-                    
-                    // Trigger the search input to push master to display & refresh the Virtual Scroller!
+                    updateStatusCount();
                     document.getElementById('search-input').dispatchEvent(new Event('input'));
                 }
-                
-                // Let the bar sit at 100% for a second before hiding it
                 setTimeout(() => {
                     container.classList.add('hidden');
                     addMusicBtn.disabled = false;
@@ -131,22 +111,18 @@ addMusicBtn.addEventListener('click', async () => {
                 }, 1500);
             }
         }, 500);
-        
     } else if (response.status === 'busy') {
         alert("An import is already running in the background.");
     }
 });
 
-// --- NEW: VIRTUAL SCROLLER & LAZY LOADING ---
-
 const ROW_HEIGHT = 52; 
-const ROW_BUFFER = 10; // How many rows to render off-screen to prevent flickering
-const coverCache = {}; // Cache images so we don't request them from Python twice
+const ROW_BUFFER = 10; 
+const coverCache = {}; 
 
 const listContainer = document.getElementById('track-list-container');
 const trackList = document.getElementById('track-list');
 
-// High-performance Virtual Renderer
 function renderVirtualList() {
     if (!libraryData.length) {
         trackList.innerHTML = '';
@@ -155,30 +131,25 @@ function renderVirtualList() {
 
     const scrollTop = listContainer.scrollTop;
     const containerHeight = listContainer.clientHeight;
-    
-    // Calculate which indexes should be visible
     const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - ROW_BUFFER);
     const endIndex = Math.min(libraryData.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + ROW_BUFFER);
     
-    // Stretch the invisible container to the total height of all 5,000 songs so the scrollbar is accurate
     trackList.style.height = `${libraryData.length * ROW_HEIGHT}px`;
-    
-    // Batch DOM updates
     const fragment = document.createDocumentFragment();
     
     for (let i = startIndex; i < endIndex; i++) {
         const track = libraryData[i];
         const li = document.createElement('li');
         
-        // Inside renderVirtualList() loop:
-        const isMissing = track.missing ? 'track-missing' : '';
+        const isSelected = selectedPaths.has(track.file_path) ? ' track-selected' : '';
+        const isMissing = track.missing ? ' track-missing' : '';
+        const isPlaying = (currentPlayingPath && track.file_path === currentPlayingPath) ? ' track-playing' : '';
         const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';
         
-        // Mathematically position the row exactly where it belongs
         li.style.transform = `translateY(${i * ROW_HEIGHT}px)`;
         li.dataset.index = i; 
-        li.className = isMissing; // Apply missing opacity if needed
-        
+        li.className = `${isMissing}${isSelected}${isPlaying}`;
+
         li.innerHTML = `
             <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || 'placeholder.png'}" alt="">
             <div class="track-title">${missingWarning}${track.title}</div>
@@ -186,22 +157,17 @@ function renderVirtualList() {
             <div class="track-album">${track.album}</div>
             <div class="track-year">${track.year}</div>
             <div class="track-duration">${track.duration}</div>
-            <button class="remove-btn" title="Remove Track">✖</button>
         `;
-        
         fragment.appendChild(li);
 
-        // Lazy load the image asynchronously if it's not in the JS cache
         if (!coverCache[track.file_path]) {
             loadCoverArt(track.file_path, i);
         }
     }
-    
     trackList.innerHTML = '';
     trackList.appendChild(fragment);
 }
 
-// Fetch image from Python without blocking the UI
 async function loadCoverArt(filePath, index) {
     try {
         const base64Data = await window.pywebview.api.get_cover(filePath);
@@ -215,111 +181,126 @@ async function loadCoverArt(filePath, index) {
     }
 }
 
-// Tie the renderer to the scroll wheel via requestAnimationFrame for 60FPS smoothness
 listContainer.addEventListener('scroll', () => {
     window.requestAnimationFrame(renderVirtualList);
 });
 
-// --- NEW: EVENT DELEGATION FOR CLICKS ---
-// One listener handles all 5,000 songs efficiently
-trackList.addEventListener('click', async (e) => {
+const doubleClickDelay = 200;
+let doubleClickOnTrackPossible = false;
+
+document.getElementById('track-list').addEventListener('click', (e) => {
+    if (!doubleClickOnTrackPossible) {
+        singleClickOnTrack(e);
+        doubleClickOnTrackPossible = true;
+        setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
+    } else {
+        doubleClickOnTrack(e);
+    }    
+});
+
+async function doubleClickOnTrack(e) {
     const row = e.target.closest('li');
     if (!row) return;
     const trackIndex = parseInt(row.dataset.index);
-    const track = libraryData[trackIndex];
-    // Handle Delete Button Click
-    if (e.target.classList.contains('remove-btn')) {
-        const result = await window.pywebview.api.remove_tracks([track.file_path]);
-        if (result.status === 'success') {
-            // UPDATED: Remove from BOTH arrays based on file_path
-            const fileToDelete = track.file_path;
-            masterLibraryData = masterLibraryData.filter(t => t.file_path !== fileToDelete);
-            libraryData = libraryData.filter(t => t.file_path !== fileToDelete);
-            renderVirtualList(); 
-        }
-        return;
-    }
-    // // NEW: Intercept clicks on missing tracks
-    // if (track.missing) {
-    //     // We only prompt if they clicked the row (not the delete button)
-    //     if (!e.target.classList.contains('remove-btn')) {
-    //         if (confirm(`The file for "${track.title}" cannot be found. It may have been moved or deleted.\n\nWould you like to locate it manually?`)) {
-                
-    //             const response = await window.pywebview.api.locate_missing_file(track.file_path);
-                
-    //             if (response.status === 'success') {
-    //                 // Update both our arrays with the new path
-    //                 const oldPath = track.file_path;
-    //                 track.file_path = response.new_path;
-    //                 track.missing = false;
-                    
-    //                 // Clear the old broken cover from cache
-    //                 delete coverCache[oldPath]; 
-                    
-    //                 renderVirtualList(); // Instantly visually heal the row
-    //             }
-    //         }
-    //     }
-    //     return; // Halt execution so it doesn't try to play a missing file
-    // }
-    // Handle Play Click
-    currentTrackIndex = trackIndex;
-    const coverSrc = await getTrackCover(track.file_path);
-    // UPDATED: Route manual clicks through the bouncer
-    await requestPlayback(trackIndex, 1, true); // true = isManualClick
-});
+    window.getSelection().removeAllRanges(); 
+    await requestPlayback(trackIndex, 1, true);
+}
 
-// Right Click Context Menu via Delegation
-trackList.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
+function singleClickOnTrack(e) {
     const row = e.target.closest('li');
     if (!row) return;
-
-    trackBeingEdited = libraryData[parseInt(row.dataset.index)];
-    contextMenu.style.left = `${e.pageX}px`;
-    contextMenu.style.top = `${e.pageY}px`;
-    contextMenu.classList.remove('hidden');
-});
-
-
-// --- NEW: Live Search Logic ---
-document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    const listItems = document.querySelectorAll('#track-list li');
     
-    listItems.forEach(li => {
-        // Grab all text inside the row (title, artist, album)
-        const trackText = li.innerText.toLowerCase();
-        
-        // Toggle visibility based on match. 
-        // We use 'grid' instead of 'block' to maintain our CSS columns!
-        if (trackText.includes(query)) {
-            li.style.display = 'grid';
-        } else {
-            li.style.display = 'none';
+    const trackIndex = parseInt(row.dataset.index);
+    const track = libraryData[trackIndex];
+    
+    if (e.shiftKey && lastClickedIndex !== null) {
+        const start = Math.min(lastClickedIndex, trackIndex);
+        const end = Math.max(lastClickedIndex, trackIndex);
+        if (!e.ctrlKey && !e.metaKey) { selectedPaths.clear(); }
+        for (let i = start; i <= end; i++) {
+            selectedPaths.add(libraryData[i].file_path);
         }
-    });
+    } else if (e.ctrlKey || e.metaKey) {
+        if (selectedPaths.has(track.file_path)) {
+            selectedPaths.delete(track.file_path);
+        } else {
+            selectedPaths.add(track.file_path);
+        }
+        lastClickedIndex = trackIndex;
+    } else {
+        selectedPaths.clear();
+        selectedPaths.add(track.file_path);
+        lastClickedIndex = trackIndex;
+    }
+    renderVirtualList();
+}
+
+document.getElementById('track-list').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const row = e.target.closest('li');
+    if (row) {
+        const trackIndex = parseInt(row.dataset.index);
+        const track = libraryData[trackIndex];
+        if (!selectedPaths.has(track.file_path)) {
+            selectedPaths.clear();
+            selectedPaths.add(track.file_path);
+            renderVirtualList();
+        }
+        contextMenu.style.left = `${e.pageX}px`;
+        contextMenu.style.top = `${e.pageY}px`;
+        contextMenu.classList.remove('hidden');
+    }
 });
 
+document.addEventListener('click', () => { contextMenu.classList.add('hidden'); });
 
-// --- Audio Playback Engine ---
+document.getElementById('ctx-remove').addEventListener('click', async () => {
+    const count = selectedPaths.size;
+    if (count === 0) return;
+
+    if (confirm(`Are you sure you want to remove ${count} track(s) from your library?\n\n(This will not delete the actual files from your hard drive).`)) {
+        const pathsArray = Array.from(selectedPaths);
+        const result = await window.pywebview.api.remove_tracks(pathsArray);
+        
+        if (result.status === 'success') {
+            masterLibraryData = masterLibraryData.filter(t => !selectedPaths.has(t.file_path));
+            libraryData = libraryData.filter(t => !selectedPaths.has(t.file_path));
+            selectedPaths.clear();
+            updateStatusCount();
+            renderVirtualList();
+        }
+    }
+});
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    if (query === '') {
+        libraryData = [...masterLibraryData];
+    } else {
+        const searchTerms = query.split(/\s+/);
+        libraryData = masterLibraryData.filter(track => {
+            const searchableText = `${track.title || ''} ${track.artist || ''} ${track.album || ''}`.toLowerCase();
+            return searchTerms.every(term => searchableText.includes(term));
+        });
+    }
+    document.getElementById('track-list-container').scrollTop = 0;
+    renderVirtualList();
+});
+
 function playTrack(track, coverSrc) {
-    initWebAudio(); // Initializes the routing if it hasn't been set up yet
+    currentPlayingPath = track.file_path;
+    renderVirtualList();
+    initWebAudio(); 
     const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
     
     audioPlayer.src = safePath;
     audioPlayer.play();
-    
     isPlaying = true;
     document.getElementById('play-pause-btn').innerText = '⏸ Pause';
-
     document.getElementById('np-title').innerText = track.title;
     document.getElementById('np-artist').innerText = track.artist;
     document.getElementById('np-cover').src = coverSrc;
 }
-
-
-// --- Player Controls & Playback Modes ---
 
 document.getElementById('play-pause-btn').addEventListener('click', () => {
     if (!audioPlayer.src) return;
@@ -333,104 +314,65 @@ document.getElementById('play-pause-btn').addEventListener('click', () => {
     isPlaying = !isPlaying;
 });
 
-// NEW: Toggle Shuffle
 document.getElementById('shuffle-btn').addEventListener('click', (e) => {
     isShuffle = !isShuffle;
     e.target.classList.toggle('active', isShuffle);
 });
 
-// NEW: Toggle Repeat
-document.getElementById('repeat-btn').addEventListener('click', (e) => {
-    isRepeat = !isRepeat;
-    e.target.classList.toggle('active', isRepeat);
+const repeatBtn = document.getElementById('repeat-btn');
+repeatBtn.addEventListener('click', () => {
+    if (repeatMode === 'off') {
+        // State 1: Repeat All
+        repeatMode = 'all';
+        repeatBtn.classList.add('active');
+        repeatBtn.innerText = '🔁';
+        repeatBtn.title = 'Repeat: All';
+    } else if (repeatMode === 'all') {
+        // State 2: Repeat One (Uses the standard '1' repeat emoji)
+        repeatMode = 'one';
+        repeatBtn.classList.add('active');
+        repeatBtn.innerText = '🔂'; 
+        repeatBtn.title = 'Repeat: One';
+    } else {
+        // State 3: Off
+        repeatMode = 'off';
+        repeatBtn.classList.remove('active');
+        repeatBtn.innerText = '🔁';
+        repeatBtn.title = 'Repeat: Off';
+    }
 });
 
-// UPDATED: Next Button / Auto-Play Logic
-function playNext() {
-    if (libraryData.length === 0 || currentTrackIndex === -1) return;
+document.getElementById('next-btn').addEventListener('click', async () => {
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1, false);
+    if (targetIndex !== -1) await requestPlayback(targetIndex, 1, false);
+});
 
-    if (isRepeat) {
-        // Repeat mode: replay the exact same track
+document.getElementById('prev-btn').addEventListener('click', async () => {
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, -1, false);
+    if (targetIndex !== -1) await requestPlayback(targetIndex, -1, false);
+});
+
+audioPlayer.addEventListener('ended', async () => {
+    // 1. Intercept "Repeat One" immediately
+    if (repeatMode === 'one') {
         audioPlayer.currentTime = 0;
         audioPlayer.play();
         return;
     }
 
-    if (isShuffle) {
-        // Shuffle mode: pick a random track (ensure it's not the exact same one if possible)
-        let randomIndex = currentTrackIndex;
-        while (randomIndex === currentTrackIndex && libraryData.length > 1) {
-            randomIndex = Math.floor(Math.random() * libraryData.length);
-        }
-        currentTrackIndex = randomIndex;
+    // 2. Otherwise, hunt for the next track (passing true for isAutoPlay)
+    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1, true);
+    
+    if (targetIndex !== -1) {
+        await requestPlayback(targetIndex, 1, false);
     } else {
-        // Standard mode: next track sequentially
-        currentTrackIndex = (currentTrackIndex + 1) % libraryData.length;
+        // 3. End of library reached and Repeat All is OFF. Reset the UI.
+        isPlaying = false;
+        document.getElementById('play-pause-btn').innerText = '▶ Play';
+        audioPlayer.currentTime = 0;
     }
-
-    const nextTrack = libraryData[currentTrackIndex];
-    playTrack(nextTrack, nextTrack.cover_base64 || placeholderImg);
-}
-
-// Example Next Button Logic
-document.getElementById('next-btn').addEventListener('click', async () => {
-    // if (libraryData.length === 0) return;
-
-    // // UPDATED: Use the smart skipping function
-    // const validIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    
-    // if (validIndex !== -1) {
-    //     currentTrackIndex = validIndex;
-    //     const track = libraryData[currentTrackIndex];
-    //     const coverSrc = await getTrackCover(track.file_path);
-    //     playTrack(track, coverSrc);
-    // } else {
-    //     alert("No valid tracks found to play.");
-    // }
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    await requestPlayback(targetIndex, 1, false);
 });
 
-// Example Previous Button Logic
-document.getElementById('prev-btn').addEventListener('click', async () => {
-    // if (libraryData.length === 0) return;
-
-    // // UPDATED: Use the smart skipping function
-    // const validIndex = getNextValidTrackIndex(currentTrackIndex, -1);
-    
-    // if (validIndex !== -1) {
-    //     currentTrackIndex = validIndex;
-    //     const track = libraryData[currentTrackIndex];
-    //     const coverSrc = await getTrackCover(track.file_path);
-    //     playTrack(track, coverSrc);
-    // } else {
-    //     alert("No valid tracks found to play.");
-    // }
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, -1);
-    await requestPlayback(targetIndex, -1, false);
-});
-
-// Example Auto-Play Next Song Logic (When current track finishes)
-audioPlayer.addEventListener('ended', async () => {
-    // if (libraryData.length === 0) return;
-    
-    // // UPDATED: Use the smart skipping function
-    // const validIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    
-    // if (validIndex !== -1) {
-    //     currentTrackIndex = validIndex;
-    //     const track = libraryData[currentTrackIndex];
-    //     const coverSrc = await getTrackCover(track.file_path);
-    //     playTrack(track, coverSrc);
-    // } else {
-    //     alert("No valid tracks found to play.");
-    // }
-    const targetIndex = getNextValidTrackIndex(currentTrackIndex, 1);
-    await requestPlayback(targetIndex, 1, false);
-});
-
-
-// --- Time and Scrubber Logic ---
 function formatTime(seconds) {
     if (isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
@@ -463,15 +405,12 @@ progressBar.addEventListener('change', () => {
     isDragging = false; 
 });
 
-// --- Volume Control ---
 const volumeBar = document.getElementById('volume-bar');
 volumeBar.addEventListener('input', () => {
     audioPlayer.volume = volumeBar.value;
 });
 
 let currentSort = { field: null, ascending: true };
-
-// Add this function to your main.js
 
 function sortLibrary(field) {
     if (currentSort.field === field) {
@@ -484,213 +423,437 @@ function sortLibrary(field) {
     libraryData.sort((a, b) => {
         let valA = a[field].toString().toLowerCase();
         let valB = b[field].toString().toLowerCase();
-        
         if (field === 'year') {
             valA = parseInt(valA) || 0;
             valB = parseInt(valB) || 0;
         }
-
         if (valA < valB) return currentSort.ascending ? -1 : 1;
         if (valA > valB) return currentSort.ascending ? 1 : -1;
         return 0;
     });
-
-    // --- UPDATED: No more loops or addTrackToUI ---
-    // Since the array is now sorted in memory, just tell the virtual 
-    // scroller to redraw the current scroll position!
     renderVirtualList();
 }
 
-// Add this inside your 'pywebviewready' initialization
 document.querySelectorAll('.col-sortable').forEach(header => {
-    header.addEventListener('click', () => {
-        sortLibrary(header.dataset.sort);
-    });
+    header.addEventListener('click', () => { sortLibrary(header.dataset.sort); });
 });
-
-// --- NEW: EDIT METADATA LOGIC ---
 
 let trackBeingEdited = null;
 const contextMenu = document.getElementById('context-menu');
-const editModal = document.getElementById('edit-modal');
 
-// Hide context menu when clicking anywhere else
-document.addEventListener('click', () => {
-    contextMenu.classList.add('hidden');
-});
-
-
-// Show the Modal
-document.getElementById('menu-edit').addEventListener('click', () => {
-    if (!trackBeingEdited) return;
-    
-    // Pre-fill the inputs
-    document.getElementById('edit-title').value = trackBeingEdited.title;
-    document.getElementById('edit-artist').value = trackBeingEdited.artist;
-    document.getElementById('edit-year').value = trackBeingEdited.year;
-    
-    editModal.classList.remove('hidden');
-});
-
-// Cancel Button
-document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-    editModal.classList.add('hidden');
-    trackBeingEdited = null;
-});
-
-// Save Button
-document.getElementById('save-edit-btn').addEventListener('click', async () => {
-    if (!trackBeingEdited) return;
-    
-    const newTitle = document.getElementById('edit-title').value;
-    const newArtist = document.getElementById('edit-artist').value;
-    const newYear = document.getElementById('edit-year').value;
-    
-    // Visual feedback while saving
-    document.getElementById('save-edit-btn').innerText = "Saving...";
-    
-    try {
-        const result = await window.pywebview.api.edit_track_metadata(
-            trackBeingEdited.file_path, newTitle, newArtist, newYear
-        );
-        
-        if (result.status === 'success') {
-            // Update JS State
-            trackBeingEdited.title = newTitle;
-            trackBeingEdited.artist = newArtist;
-            trackBeingEdited.year = newYear;
-            
-            // Re-render the UI
-            renderVirtualList(); 
-            
-            // If the playing track was edited, update the Now Playing UI
-            if (currentTrackIndex !== -1 && libraryData[currentTrackIndex].file_path === trackBeingEdited.file_path) {
-                document.getElementById('np-title').innerText = newTitle;
-                document.getElementById('np-artist').innerText = newArtist;
-            }
-        } else {
-            alert("Error saving file: " + result.message);
-        }
-    } catch (e) {
-        console.error(e);
-    }
-    
-    document.getElementById('save-edit-btn').innerText = "Save to File";
-    editModal.classList.add('hidden');
-    trackBeingEdited = null;
-});
-
-document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    
-    if (query === '') {
-        // If search is empty, restore the full library
-        libraryData = [...masterLibraryData];
-    } else {
-        // Filter the master list based on Title, Artist, or Album
-        libraryData = masterLibraryData.filter(track => {
-            // Safely handle null/undefined fields just in case
-            const title = (track.title || '').toLowerCase();
-            const artist = (track.artist || '').toLowerCase();
-            const album = (track.album || '').toLowerCase();
-            
-            return title.includes(query) || artist.includes(query) || album.includes(query);
-        });
-    }
-    
-    // CRITICAL: Reset scroll position to top. 
-    // If you are scrolled down to song #4000 and search for a single track, 
-    // the virtual scroller will render blank space unless we snap back to the top!
-    document.getElementById('track-list-container').scrollTop = 0;
-    
-    // Re-draw the screen
-    renderVirtualList();
-});
-
-// --- NEW: Universal Cover Art Fetcher ---
 async function getTrackCover(filePath) {
-    // 1. If we already have it in memory, return it instantly
-    if (coverCache[filePath]) {
-        return coverCache[filePath];
-    }
-    
-    // 2. If not, ask the Python backend for it
+    if (coverCache[filePath]) { return coverCache[filePath]; }
     try {
         const base64Data = await window.pywebview.api.get_cover(filePath);
         if (base64Data) {
-            coverCache[filePath] = base64Data; // Save it for later
+            coverCache[filePath] = base64Data; 
             return base64Data;
         }
     } catch (e) {
         console.error("Cover fetch failed during playback:", e);
     }
-    
-    // 3. Fallback if the file has no cover art
     return 'placeholder.png'; 
 }
 
-// Hunts for the next available song that actually exists on the hard drive
-function getNextValidTrackIndex(startIndex, direction = 1) {
+// NEW: Added an 'isAutoPlay' flag so the player knows if a song ended naturally 
+// or if the user actively clicked the "Next" button.
+function getNextValidTrackIndex(startIndex, direction = 1, isAutoPlay = false) {
+    if (libraryData.length === 0) return -1;
+
+    // --- SHUFFLE LOGIC (Only applies when moving forward) ---
+    if (isShuffle && direction === 1) {
+        let attempts = 0;
+        while (attempts < libraryData.length) {
+            let randomIndex = Math.floor(Math.random() * libraryData.length);
+            if (!libraryData[randomIndex].missing && randomIndex !== startIndex) {
+                return randomIndex;
+            }
+            attempts++;
+        }
+        return startIndex; // Fallback if everything else is missing
+    }
+
+    // --- STANDARD SEQUENTIAL LOGIC ---
     let index = startIndex;
     let attempts = 0;
-    
-    // Prevent infinite loops if literally every song is missing
+
     while (attempts < libraryData.length) {
-        index = (index + direction + libraryData.length) % libraryData.length;
+        index += direction;
+
+        // Handle boundaries
+        if (index >= libraryData.length) {
+            // If the song just ended naturally and Repeat All is off, STOP playing.
+            if (isAutoPlay && repeatMode === 'off') {
+                return -1; 
+            }
+            index = 0; // Otherwise, wrap around to the start
+        } else if (index < 0) {
+            index = libraryData.length - 1; // Wrap around to the end when hitting Previous
+        }
+
         if (!libraryData[index].missing) {
             return index;
         }
         attempts++;
     }
-    return -1; // Everything is dead
+    return -1; // Everything is missing
 }
 
-// --- NEW: Centralized Playback Request Manager ---
 async function requestPlayback(targetIndex, direction = 1, isManualClick = false) {
     if (libraryData.length === 0 || targetIndex === -1) return;
-
     const track = libraryData[targetIndex];
-
-    // 1. JIT VERIFICATION: Ping Python to see if the file is STILL there
     const exists = await window.pywebview.api.check_file_exists(track.file_path);
 
     if (!exists) {
-        // Mark as missing in memory and visually update immediately
         track.missing = true;
         renderVirtualList();
-
         if (isManualClick) {
-            // BEHAVIOR A: The user explicitly clicked a dead track. Ask them to fix it.
             if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
-                
                 const response = await window.pywebview.api.locate_missing_file(track.file_path);
-                
                 if (response.status === 'success') {
                     const oldPath = track.file_path;
                     track.file_path = response.new_path;
                     track.missing = false;
                     delete coverCache[oldPath];
-                    renderVirtualList(); // Heal UI
-                    
-                    // Success! Recursively call this function to play the healed track
+                    renderVirtualList(); 
                     requestPlayback(targetIndex, direction, isManualClick);
                 }
             }
         } else {
-            // BEHAVIOR B: The app tried to auto-play a dead track. Skip it silently.
             console.warn(`Skipping missing track: ${track.title}`);
             const nextValidIndex = getNextValidTrackIndex(targetIndex, direction);
-            
             if (nextValidIndex !== -1 && nextValidIndex !== targetIndex) {
-                // Recursively move to the next valid track
                 requestPlayback(nextValidIndex, direction, false);
             }
         }
-        return; // Halt execution for this dead track so the audio engine doesn't crash
+        return; 
     }
 
-    // 2. FILE EXISTS: Proceed with normal playback
     currentTrackIndex = targetIndex;
     const coverSrc = await getTrackCover(track.file_path);
     playTrack(track, coverSrc);
 }
+
+const editModal = document.getElementById('edit-modal-overlay');
+const fieldsToEdit = ['title', 'artist', 'album', 'album_artist', 'genre', 'year', 'track_num', 'disc_num', 'comments'];
+
+document.getElementById('ctx-edit').addEventListener('click', () => {
+    const pathsArray = Array.from(selectedPaths);
+    if (pathsArray.length === 0) return;
+    document.getElementById('context-menu').classList.add('hidden');
+    editModal.classList.remove('hidden');
+    
+    fieldsToEdit.forEach(field => {
+        const input = document.getElementById(`edit-${field}`);
+        const firstVal = masterLibraryData.find(t => t.file_path === pathsArray[0])[field];
+        const allSame = pathsArray.every(path => masterLibraryData.find(t => t.file_path === path)[field] === firstVal);
+
+        if (allSame) {
+            input.value = firstVal || "";
+            input.placeholder = "";
+        } else {
+            input.value = "";
+            input.placeholder = "(Multiple Values)";
+        }
+        input.dataset.original = input.value;
+    });
+
+    const compBox = document.getElementById('edit-compilation');
+    const firstComp = masterLibraryData.find(t => t.file_path === pathsArray[0]).compilation;
+    const allSameComp = pathsArray.every(path => masterLibraryData.find(t => t.file_path === path).compilation === firstComp);
+    
+    compBox.indeterminate = !allSameComp; 
+    compBox.checked = allSameComp ? (firstComp === 1) : false;
+    compBox.dataset.originalState = allSameComp ? (firstComp === 1).toString() : "mixed";
+});
+
+document.getElementById('btn-cancel-edit').addEventListener('click', () => { editModal.classList.add('hidden'); });
+
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+    const pathsArray = Array.from(selectedPaths);
+    const saveBtn = document.getElementById('btn-save-edit');
+    const modifiedData = {};
+
+    fieldsToEdit.forEach(field => {
+        const input = document.getElementById(`edit-${field}`);
+        if (input.value !== input.dataset.original) {
+            if (!(input.placeholder === "(Multiple Values)" && input.value === "")) {
+                modifiedData[field] = input.value;
+            }
+        }
+    });
+
+    const compBox = document.getElementById('edit-compilation');
+    if (compBox.dataset.originalState === "mixed" && !compBox.indeterminate) {
+        modifiedData['compilation'] = compBox.checked ? 1 : 0;
+    } else if (compBox.dataset.originalState !== "mixed" && compBox.checked.toString() !== compBox.dataset.originalState) {
+        modifiedData['compilation'] = compBox.checked ? 1 : 0;
+    }
+
+    if (Object.keys(modifiedData).length === 0) {
+        editModal.classList.add('hidden');
+        return;
+    }
+
+    saveBtn.innerText = "Saving...";
+    saveBtn.disabled = true;
+
+    const result = await window.pywebview.api.update_metadata(pathsArray, modifiedData);
+
+    if (result.status === 'success') {
+        pathsArray.forEach(path => {
+            const masterTrack = masterLibraryData.find(t => t.file_path === path);
+            Object.keys(modifiedData).forEach(key => {
+                masterTrack[key] = modifiedData[key];
+            });
+        });
+        document.getElementById('search-input').dispatchEvent(new Event('input'));
+        editModal.classList.add('hidden');
+    } else {
+        alert("An error occurred while saving metadata. Check the console.");
+    }
+
+    saveBtn.innerText = "Save Changes";
+    saveBtn.disabled = false;
+});
+
+// --- NEW: VIEW TOGGLING ---
+const listViewWrapper = document.getElementById('list-view-wrapper');
+const gridViewWrapper = document.getElementById('grid-view-wrapper');
+const toggleListBtn = document.getElementById('toggle-list-btn');
+const toggleGridBtn = document.getElementById('toggle-grid-btn');
+
+toggleListBtn.addEventListener('click', () => {
+    currentView = 'list';
+    toggleListBtn.classList.add('active');
+    toggleGridBtn.classList.remove('active');
+    gridViewWrapper.classList.add('hidden');
+    listViewWrapper.classList.remove('hidden');
+    renderVirtualList();
+});
+
+toggleGridBtn.addEventListener('click', () => {
+    currentView = 'grid';
+    toggleGridBtn.classList.add('active');
+    toggleListBtn.classList.remove('active');
+    listViewWrapper.classList.add('hidden');
+    gridViewWrapper.classList.remove('hidden');
+    renderAlbumGrid();
+});
+
+// Update the end of your live search listener to respect the active view:
+document.getElementById('search-input').addEventListener('input', (e) => {
+    // ... (keep existing filtering logic) ...
+    
+    if (currentView === 'list') {
+        document.getElementById('track-list-container').scrollTop = 0;
+        renderVirtualList();
+    } else {
+        renderAlbumGrid();
+    }
+});
+
+// --- NEW: ALBUM GRID ENGINE ---
+
+const albumGrid = document.getElementById('album-grid');
+let activeExpandedCard = null; // Tracks which album is currently open
+
+// 1. Group the flat libraryData into distinct albums
+function processAlbums() {
+    const albumMap = new Map();
+    
+    libraryData.forEach((track, index) => {
+        // Prevent compilation collisions by binding album to artist
+        const key = `${track.album}||${track.album_artist || track.artist}`;
+        
+        if (!albumMap.has(key)) {
+            albumMap.set(key, {
+                title: track.album || 'Unknown Album',
+                artist: track.album_artist || track.artist || 'Unknown Artist',
+                coverPath: track.file_path, // Base cover path
+                tracks: []
+            });
+        }
+        
+        // Push track with its GLOBAL index so double-clicks map perfectly
+        albumMap.get(key).tracks.push({ ...track, globalIndex: index });
+    });
+    
+    // Sort tracks within each album by Disc and Track Number
+    albumMap.forEach(album => {
+        album.tracks.sort((a, b) => {
+            const discA = parseInt(a.disc_num) || 1;
+            const discB = parseInt(b.disc_num) || 1;
+            if (discA !== discB) return discA - discB;
+            
+            const trackA = parseInt(a.track_num) || 0;
+            const trackB = parseInt(b.track_num) || 0;
+            return trackA - trackB;
+        });
+    });
+    
+    gridAlbums = Array.from(albumMap.values());
+}
+
+// 2. Render the Grid
+function renderAlbumGrid() {
+    processAlbums();
+    albumGrid.innerHTML = '';
+    closeExpandedAlbum(); 
+    
+    const fragment = document.createDocumentFragment();
+
+    // Intersection Observer to lazy load covers as they scroll into view
+    const coverObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(async entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const path = img.dataset.path;
+                const coverSrc = await getTrackCover(path);
+                img.src = coverSrc;
+                observer.unobserve(img);
+            }
+        });
+    }, { root: document.getElementById('grid-view-wrapper'), rootMargin: '200px' });
+
+    gridAlbums.forEach((album, idx) => {
+        const card = document.createElement('div');
+        card.className = 'album-card';
+        card.dataset.index = idx;
+        
+        // Try cache first, otherwise use placeholder and observe
+        const cachedCover = coverCache[album.coverPath];
+        const imgSrc = cachedCover ? cachedCover : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
+        card.innerHTML = `
+            <img class="album-card-cover" src="${imgSrc}" data-path="${album.coverPath}" alt="">
+            <div class="album-card-title">${album.title}</div>
+            <div class="album-card-artist">${album.artist}</div>
+        `;
+        
+        if (!cachedCover) {
+            coverObserver.observe(card.querySelector('img'));
+        }
+
+        // Open expansion on click
+        card.addEventListener('click', (e) => {
+            if (activeExpandedCard === card) {
+                closeExpandedAlbum(); // Toggle off if clicking the same album
+            } else {
+                openExpandedAlbum(album, card);
+            }
+        });
+
+        fragment.appendChild(card);
+    });
+
+    albumGrid.appendChild(fragment);
+}
+
+// 3. The Inline Expansion Logic
+function openExpandedAlbum(albumData, cardElement) {
+    closeExpandedAlbum(); // Clean up existing
+    
+    activeExpandedCard = cardElement;
+    cardElement.classList.add('active-card');
+
+    // Mathematically find the end of the visual row
+    const cards = Array.from(albumGrid.querySelectorAll('.album-card'));
+    const clickedIndex = cards.indexOf(cardElement);
+    const clickedTop = cardElement.offsetTop;
+    
+    let insertIndex = clickedIndex;
+    // Look ahead: as long as the next card has the same Y position, it's in the same row
+    while (insertIndex + 1 < cards.length && cards[insertIndex + 1].offsetTop === clickedTop) {
+        insertIndex++;
+    }
+
+    // Build the Expansion DOM
+    const expansionContainer = document.createElement('div');
+    expansionContainer.className = 'album-expanded-row';
+    expansionContainer.id = 'active-expansion-row';
+
+    // Build the tracklist HTML
+    let trackListHTML = '<ul class="expanded-track-list" id="expanded-track-list">';
+    albumData.tracks.forEach(t => {
+        const isPlaying = (currentPlayingPath && t.file_path === currentPlayingPath) ? ' track-playing' : '';
+        const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
+        const missingWarning = t.missing ? '⚠️ ' : '';
+        
+        trackListHTML += `
+            <li class="${isPlaying}${isSelected}" data-index="${t.globalIndex}" data-filepath="${t.file_path}">
+                <div>${t.track_num || '-'}</div>
+                <div class="track-title">${missingWarning}${t.title}</div>
+                <div>${t.duration}</div>
+            </li>
+        `;
+    });
+    trackListHTML += '</ul>';
+
+    expansionContainer.innerHTML = `
+        <div class="expanded-cover-container">
+            <img id="expanded-highres-cover" src="${coverCache[albumData.coverPath] || 'placeholder.png'}">
+        </div>
+        <div class="expanded-tracklist-container">
+            <h2 style="margin:0 0 5px 0;">${albumData.title}</h2>
+            <div style="color:var(--text-secondary); font-size:13px; margin-bottom:15px;">${albumData.artist} • ${albumData.tracks.length} Tracks</div>
+            ${trackListHTML}
+        </div>
+    `;
+
+    // Insert directly after the last item in the row
+    if (insertIndex === cards.length - 1) {
+        albumGrid.appendChild(expansionContainer);
+    } else {
+        albumGrid.insertBefore(expansionContainer, cards[insertIndex + 1]);
+    }
+
+    // Attempt to load a high-res cover just in case
+    getTrackCover(albumData.coverPath).then(src => {
+        document.getElementById('expanded-highres-cover').src = src;
+    });
+
+    // Wire up clicks! We reuse our existing single/double click functions by passing a mocked event
+    const expandedList = document.getElementById('expanded-track-list');
+    
+    expandedList.addEventListener('click', (e) => {
+        const li = e.target.closest('li');
+        if (!li) return;
+        
+        if (!doubleClickOnTrackPossible) {
+            singleClickOnTrack(e); // This inherently looks for closest('li').dataset.index!
+            
+            // Re-render the inner list to show the selection highlight
+            Array.from(expandedList.children).forEach(child => {
+                if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
+                else child.classList.remove('track-selected');
+            });
+            
+            doubleClickOnTrackPossible = true;
+            setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
+        } else {
+            // Double click caught! Route to the bouncer using the global index!
+            window.getSelection().removeAllRanges(); 
+            requestPlayback(parseInt(li.dataset.index), 1, true);
+        }    
+    });
+    
+    // Smooth scroll into view
+    setTimeout(() => {
+        expansionContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+}
+
+function closeExpandedAlbum() {
+    const existingRow = document.getElementById('active-expansion-row');
+    if (existingRow) existingRow.remove();
+    if (activeExpandedCard) activeExpandedCard.classList.remove('active-card');
+    activeExpandedCard = null;
+}
+
+// Ensure the expanded row closes if the window resizes, as column counts will shift!
+window.addEventListener('resize', () => {
+    if (currentView === 'grid' && activeExpandedCard) {
+        closeExpandedAlbum();
+    }
+});
