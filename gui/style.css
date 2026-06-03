@@ -641,3 +641,29 @@ input[type="range"] {
 
 .expanded-track-list li:hover { background-color: var(--bg-panel); }
 .expanded-track-list li .track-title { color: var(--text-main); }
+
+/* --- Textual Toggle Buttons --- */
+.view-btn {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: normal;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-btn:hover {
+    color: var(--text-main);
+    background-color: var(--bg-hover);
+}
+
+.view-btn.active {
+    background-color: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: bold;
+}
+
