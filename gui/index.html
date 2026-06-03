@@ -47,23 +47,37 @@
     </header>
 
     <main class="library-container">
-      <div class="list-header" id="list-header">
-        <div class="col-cover"></div>
-        <div class="col-sortable" data-sort="title">Title</div>
-        <div class="col-sortable" data-sort="artist">Artist</div>
-        <div class="col-sortable" data-sort="album">Album</div>
-        <div class="col-sortable" data-sort="year">Year</div>
-        <div class="col-sortable" data-sort="duration">Time</div>
-        <div class="col-remove"></div>
+      <div id="list-view-wrapper" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="list-header" id="list-header">
+          <div class="col-cover"></div>
+          <div class="col-sortable" data-sort="title">Title</div>
+          <div class="col-sortable" data-sort="artist">Artist</div>
+          <div class="col-sortable" data-sort="album">Album</div>
+          <div class="col-sortable" data-sort="year">Year</div>
+          <div class="col-sortable" data-sort="duration">Time</div>
+          <div class="col-remove"></div>
+        </div>
+        <div id="track-list-container">
+          <ul id="track-list"></ul>
+        </div>
       </div>
-      <div id="track-list-container">
-        <ul id="track-list"></ul>
+
+      <div id="grid-view-wrapper" class="hidden" style="height: 100%; overflow-y: auto;">
+        <div id="album-grid">
+            </div>
       </div>
     </main>
 
     <footer class="status-bar">
-      <button id="add-music-btn">Add Music</button>
-      <div id="status-text">0 tracks in library</div>
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <button id="add-music-btn">Add Music</button>
+        <div id="status-text">0 tracks in library</div>
+      </div>
+      
+      <div class="view-toggles" style="display: flex; gap: 10px;">
+        <button id="toggle-list-btn" class="icon-btn active" title="Table View">📄</button>
+        <button id="toggle-grid-btn" class="icon-btn" title="Grid View">🔲</button>
+      </div>
     </footer>
 
     <div id="context-menu" class="hidden">

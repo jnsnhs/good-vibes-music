@@ -17,6 +17,9 @@ let audioSource;
 let compressor;
 let isNormalized = false;
 
+let currentView = 'list'; // NEW: Tracks 'list' or 'grid'
+let gridAlbums = [];      // NEW: Holds parsed album data
+
 // Dynamic Status Bar Count Handler
 function updateStatusCount() {
     const statusText = document.getElementById('status-text');
@@ -612,4 +615,245 @@ document.getElementById('btn-save-edit').addEventListener('click', async () => {
 
     saveBtn.innerText = "Save Changes";
     saveBtn.disabled = false;
+});
+
+// --- NEW: VIEW TOGGLING ---
+const listViewWrapper = document.getElementById('list-view-wrapper');
+const gridViewWrapper = document.getElementById('grid-view-wrapper');
+const toggleListBtn = document.getElementById('toggle-list-btn');
+const toggleGridBtn = document.getElementById('toggle-grid-btn');
+
+toggleListBtn.addEventListener('click', () => {
+    currentView = 'list';
+    toggleListBtn.classList.add('active');
+    toggleGridBtn.classList.remove('active');
+    gridViewWrapper.classList.add('hidden');
+    listViewWrapper.classList.remove('hidden');
+    renderVirtualList();
+});
+
+toggleGridBtn.addEventListener('click', () => {
+    currentView = 'grid';
+    toggleGridBtn.classList.add('active');
+    toggleListBtn.classList.remove('active');
+    listViewWrapper.classList.add('hidden');
+    gridViewWrapper.classList.remove('hidden');
+    renderAlbumGrid();
+});
+
+// Update the end of your live search listener to respect the active view:
+document.getElementById('search-input').addEventListener('input', (e) => {
+    // ... (keep existing filtering logic) ...
+    
+    if (currentView === 'list') {
+        document.getElementById('track-list-container').scrollTop = 0;
+        renderVirtualList();
+    } else {
+        renderAlbumGrid();
+    }
+});
+
+// --- NEW: ALBUM GRID ENGINE ---
+
+const albumGrid = document.getElementById('album-grid');
+let activeExpandedCard = null; // Tracks which album is currently open
+
+// 1. Group the flat libraryData into distinct albums
+function processAlbums() {
+    const albumMap = new Map();
+    
+    libraryData.forEach((track, index) => {
+        // Prevent compilation collisions by binding album to artist
+        const key = `${track.album}||${track.album_artist || track.artist}`;
+        
+        if (!albumMap.has(key)) {
+            albumMap.set(key, {
+                title: track.album || 'Unknown Album',
+                artist: track.album_artist || track.artist || 'Unknown Artist',
+                coverPath: track.file_path, // Base cover path
+                tracks: []
+            });
+        }
+        
+        // Push track with its GLOBAL index so double-clicks map perfectly
+        albumMap.get(key).tracks.push({ ...track, globalIndex: index });
+    });
+    
+    // Sort tracks within each album by Disc and Track Number
+    albumMap.forEach(album => {
+        album.tracks.sort((a, b) => {
+            const discA = parseInt(a.disc_num) || 1;
+            const discB = parseInt(b.disc_num) || 1;
+            if (discA !== discB) return discA - discB;
+            
+            const trackA = parseInt(a.track_num) || 0;
+            const trackB = parseInt(b.track_num) || 0;
+            return trackA - trackB;
+        });
+    });
+    
+    gridAlbums = Array.from(albumMap.values());
+}
+
+// 2. Render the Grid
+function renderAlbumGrid() {
+    processAlbums();
+    albumGrid.innerHTML = '';
+    closeExpandedAlbum(); 
+    
+    const fragment = document.createDocumentFragment();
+
+    // Intersection Observer to lazy load covers as they scroll into view
+    const coverObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(async entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const path = img.dataset.path;
+                const coverSrc = await getTrackCover(path);
+                img.src = coverSrc;
+                observer.unobserve(img);
+            }
+        });
+    }, { root: document.getElementById('grid-view-wrapper'), rootMargin: '200px' });
+
+    gridAlbums.forEach((album, idx) => {
+        const card = document.createElement('div');
+        card.className = 'album-card';
+        card.dataset.index = idx;
+        
+        // Try cache first, otherwise use placeholder and observe
+        const cachedCover = coverCache[album.coverPath];
+        const imgSrc = cachedCover ? cachedCover : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
+        card.innerHTML = `
+            <img class="album-card-cover" src="${imgSrc}" data-path="${album.coverPath}" alt="">
+            <div class="album-card-title">${album.title}</div>
+            <div class="album-card-artist">${album.artist}</div>
+        `;
+        
+        if (!cachedCover) {
+            coverObserver.observe(card.querySelector('img'));
+        }
+
+        // Open expansion on click
+        card.addEventListener('click', (e) => {
+            if (activeExpandedCard === card) {
+                closeExpandedAlbum(); // Toggle off if clicking the same album
+            } else {
+                openExpandedAlbum(album, card);
+            }
+        });
+
+        fragment.appendChild(card);
+    });
+
+    albumGrid.appendChild(fragment);
+}
+
+// 3. The Inline Expansion Logic
+function openExpandedAlbum(albumData, cardElement) {
+    closeExpandedAlbum(); // Clean up existing
+    
+    activeExpandedCard = cardElement;
+    cardElement.classList.add('active-card');
+
+    // Mathematically find the end of the visual row
+    const cards = Array.from(albumGrid.querySelectorAll('.album-card'));
+    const clickedIndex = cards.indexOf(cardElement);
+    const clickedTop = cardElement.offsetTop;
+    
+    let insertIndex = clickedIndex;
+    // Look ahead: as long as the next card has the same Y position, it's in the same row
+    while (insertIndex + 1 < cards.length && cards[insertIndex + 1].offsetTop === clickedTop) {
+        insertIndex++;
+    }
+
+    // Build the Expansion DOM
+    const expansionContainer = document.createElement('div');
+    expansionContainer.className = 'album-expanded-row';
+    expansionContainer.id = 'active-expansion-row';
+
+    // Build the tracklist HTML
+    let trackListHTML = '<ul class="expanded-track-list" id="expanded-track-list">';
+    albumData.tracks.forEach(t => {
+        const isPlaying = (currentPlayingPath && t.file_path === currentPlayingPath) ? ' track-playing' : '';
+        const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
+        const missingWarning = t.missing ? '⚠️ ' : '';
+        
+        trackListHTML += `
+            <li class="${isPlaying}${isSelected}" data-index="${t.globalIndex}" data-filepath="${t.file_path}">
+                <div>${t.track_num || '-'}</div>
+                <div class="track-title">${missingWarning}${t.title}</div>
+                <div>${t.duration}</div>
+            </li>
+        `;
+    });
+    trackListHTML += '</ul>';
+
+    expansionContainer.innerHTML = `
+        <div class="expanded-cover-container">
+            <img id="expanded-highres-cover" src="${coverCache[albumData.coverPath] || 'placeholder.png'}">
+        </div>
+        <div class="expanded-tracklist-container">
+            <h2 style="margin:0 0 5px 0;">${albumData.title}</h2>
+            <div style="color:var(--text-secondary); font-size:13px; margin-bottom:15px;">${albumData.artist} • ${albumData.tracks.length} Tracks</div>
+            ${trackListHTML}
+        </div>
+    `;
+
+    // Insert directly after the last item in the row
+    if (insertIndex === cards.length - 1) {
+        albumGrid.appendChild(expansionContainer);
+    } else {
+        albumGrid.insertBefore(expansionContainer, cards[insertIndex + 1]);
+    }
+
+    // Attempt to load a high-res cover just in case
+    getTrackCover(albumData.coverPath).then(src => {
+        document.getElementById('expanded-highres-cover').src = src;
+    });
+
+    // Wire up clicks! We reuse our existing single/double click functions by passing a mocked event
+    const expandedList = document.getElementById('expanded-track-list');
+    
+    expandedList.addEventListener('click', (e) => {
+        const li = e.target.closest('li');
+        if (!li) return;
+        
+        if (!doubleClickOnTrackPossible) {
+            singleClickOnTrack(e); // This inherently looks for closest('li').dataset.index!
+            
+            // Re-render the inner list to show the selection highlight
+            Array.from(expandedList.children).forEach(child => {
+                if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
+                else child.classList.remove('track-selected');
+            });
+            
+            doubleClickOnTrackPossible = true;
+            setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
+        } else {
+            // Double click caught! Route to the bouncer using the global index!
+            window.getSelection().removeAllRanges(); 
+            requestPlayback(parseInt(li.dataset.index), 1, true);
+        }    
+    });
+    
+    // Smooth scroll into view
+    setTimeout(() => {
+        expansionContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+}
+
+function closeExpandedAlbum() {
+    const existingRow = document.getElementById('active-expansion-row');
+    if (existingRow) existingRow.remove();
+    if (activeExpandedCard) activeExpandedCard.classList.remove('active-card');
+    activeExpandedCard = null;
+}
+
+// Ensure the expanded row closes if the window resizes, as column counts will shift!
+window.addEventListener('resize', () => {
+    if (currentView === 'grid' && activeExpandedCard) {
+        closeExpandedAlbum();
+    }
 });

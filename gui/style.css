@@ -519,3 +519,125 @@ input[type="range"] {
 .track-playing .track-album {
     color: var(--accent) !important;
 }
+
+/* =========================================
+   12. ALBUM GRID VIEW
+   ========================================= */
+#album-grid {
+    display: grid;
+    /* Auto-fill creates as many columns as fit in the container */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    position: relative;
+}
+
+.album-card {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 10px;
+    transition: background-color 0.2s, transform 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.album-card:hover {
+    background-color: var(--bg-hover);
+    transform: translateY(-2px);
+}
+
+.album-card.active-card {
+    background-color: var(--bg-hover);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.album-card-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    background-color: var(--bg-input);
+}
+
+.album-card-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.album-card-artist {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Inline Expansion Row --- */
+.album-expanded-row {
+    grid-column: 1 / -1; /* Forces the element to span exactly 100% of the grid width */
+    background-color: var(--bg-hover);
+    border-radius: 10px;
+    padding: 25px;
+    display: flex;
+    gap: 30px;
+    box-shadow: inset 0 2px 15px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.expanded-cover-container {
+    flex-shrink: 0;
+    width: 220px;
+}
+
+.expanded-cover-container img {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.expanded-tracklist-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 250px;
+    padding-right: 10px;
+}
+
+/* We reuse our existing list list elements, but tweak them for the grid context */
+.expanded-track-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.expanded-track-list li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 50px;
+    gap: 15px;
+    align-items: center;
+    padding: 8px 15px;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-radius: 4px;
+}
+
+.expanded-track-list li:hover { background-color: var(--bg-panel); }
+.expanded-track-list li .track-title { color: var(--text-main); }
