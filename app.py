@@ -355,38 +355,6 @@ class Api:
         
         return {"status": "success"}
     
-    # NEW: Write metadata to MP3/M4A and update database
-    # def edit_track_metadata(self, file_path, new_title, new_artist, new_year):
-    #     try:
-    #         # 1. Update the physical file
-    #         # easy=True gives us a unified interface for both MP3 and M4A files
-    #         audio = File(file_path, easy=True) 
-    #         if audio is None:
-    #             return {"status": "error", "message": "Unsupported file format."}
-
-    #         # Mutagen expects lists for values
-    #         audio['title'] = [new_title]
-    #         audio['artist'] = [new_artist]
-    #         audio['date'] = [str(new_year)] # 'date' acts as the year tag across formats
-    #         audio.save()
-
-    #         # 2. Update the SQLite Database
-    #         conn = sqlite3.connect('library.db')
-    #         c = conn.cursor()
-    #         c.execute('''
-    #             UPDATE tracks 
-    #             SET title = ?, artist = ?, year = ? 
-    #             WHERE file_path = ?
-    #         ''', (new_title, new_artist, str(new_year), file_path))
-    #         conn.commit()
-    #         conn.close()
-
-    #         return {"status": "success"}
-
-    #     except Exception as e:
-    #         print(f"Error editing tag: {e}")
-    #         return {"status": "error", "message": str(e)}
-        
     def update_metadata(self, file_paths, modified_data):
 
         
@@ -431,18 +399,21 @@ class Api:
 
     def check_file_exists(self, file_path):
         return os.path.exists(file_path)
-    
+
+
 
 if __name__ == '__main__':
     init_db()
     start_audio_server()     
     api = Api()
     window = webview.create_window(
-        title='Good Vibes Music', 
-        url='gui/index.html', 
+        title='GoodVibes',
+        url='gui/index.html',
         js_api=api, 
-        width=1000, 
-        height=750,
-        resizable=True
+        width=900, 
+        height=600,
+        resizable=True,
+        frameless=False,
+        min_size=(816, 420)
     )
     webview.start(debug=True)

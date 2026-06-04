@@ -9,7 +9,8 @@ let repeatMode = 'off';
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
 
 let selectedPaths = new Set(); 
-let lastClickedIndex = null;   
+let lastClickedIndex = null;
+let lastGridClickedIndex = null; // NEW: Tracks shift-click anchors exclusively for the Album Grid
 let currentPlayingPath = null; 
 
 let audioCtx;
@@ -329,7 +330,7 @@ function playTrack(track, coverSrc) {
     audioPlayer.src = safePath;
     audioPlayer.play();
     isPlaying = true;
-    document.getElementById('play-pause-btn').innerText = '⏸ Pause';
+    document.getElementById('play-pause-btn').innerText = '⏸';
     document.getElementById('np-title').innerText = track.title;
     document.getElementById('np-artist').innerText = track.artist;
     document.getElementById('np-cover').src = coverSrc;
@@ -339,10 +340,10 @@ document.getElementById('play-pause-btn').addEventListener('click', () => {
     if (!audioPlayer.src) return;
     if (isPlaying) {
         audioPlayer.pause();
-        document.getElementById('play-pause-btn').innerText = '▶ Play';
+        document.getElementById('play-pause-btn').innerText = '▶';
     } else {
         audioPlayer.play();
-        document.getElementById('play-pause-btn').innerText = '⏸ Pause';
+        document.getElementById('play-pause-btn').innerText = '⏸';
     }
     isPlaying = !isPlaying;
 });
@@ -401,7 +402,7 @@ audioPlayer.addEventListener('ended', async () => {
     } else {
         // 3. End of library reached and Repeat All is OFF. Reset the UI.
         isPlaying = false;
-        document.getElementById('play-pause-btn').innerText = '▶ Play';
+        document.getElementById('play-pause-btn').innerText = '▶';
         audioPlayer.currentTime = 0;
     }
 });
@@ -714,24 +715,21 @@ function processAlbums() {
     const albumMap = new Map();
     
     libraryData.forEach((track, index) => {
-        // Prevent compilation collisions by binding album to artist
         const key = `${track.album}||${track.album_artist || track.artist}`;
         
         if (!albumMap.has(key)) {
             albumMap.set(key, {
-                key: key, // NEW: Store the unique key
+                key: key, 
                 title: track.album || 'Unknown Album',
                 artist: track.album_artist || track.artist || 'Unknown Artist',
                 coverPath: track.file_path, 
                 tracks: []
             });
         }
-        
-        // Push track with its GLOBAL index so double-clicks map perfectly
         albumMap.get(key).tracks.push({ ...track, globalIndex: index });
     });
     
-    // Sort tracks within each album by Disc and Track Number
+    // Sort tracks inside the album
     albumMap.forEach(album => {
         album.tracks.sort((a, b) => {
             const discA = parseInt(a.disc_num) || 1;
@@ -744,10 +742,29 @@ function processAlbums() {
         });
     });
 
-    
-    
     gridAlbums = Array.from(albumMap.values());
+
+    // --- NEW: INDEPENDENT GRID SORTING ---
+    // This explicitly sorts the grid by Artist -> Year -> Album Title,
+    // completely ignoring how the List View is currently sorted!
+    gridAlbums.sort((a, b) => {
+        const artistA = (a.artist || '').toLowerCase();
+        const artistB = (b.artist || '').toLowerCase();
+        if (artistA !== artistB) return artistA.localeCompare(artistB);
+
+        // If artists match, sort chronologically
+        const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
+        const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
+        if (yearA !== yearB) return yearA - yearB;
+
+        // If years match, sort alphabetically by album title
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        return titleA.localeCompare(titleB);
+    });
 }
+
+
 
 // 2. Render the Grid
 function renderAlbumGrid() {
@@ -869,10 +886,9 @@ function openExpandedAlbum(albumData, cardElement) {
     const useTwoColumns = currentColumns > 4 && albumData.tracks.length > 4;
     let trackListHTML = `<ul class="expanded-track-list ${useTwoColumns ? 'two-column' : ''}" id="expanded-track-list">`;    let currentDisc = null;
 
-    albumData.tracks.forEach(t => {
+    albumData.tracks.forEach((t, idx) => {
         const trackDisc = parseInt(t.disc_num) || 1;
         
-        // Inject Disc Header if it's a new disc in a multi-disc album
         if (hasMultipleDiscs && trackDisc !== currentDisc) {
             trackListHTML += `<li class="disc-header">Disc ${trackDisc}</li>`;
             currentDisc = trackDisc;
@@ -882,8 +898,9 @@ function openExpandedAlbum(albumData, cardElement) {
         const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
         const missingWarning = t.missing ? '⚠️ ' : '';
         
+        // UPDATED: Added data-album-index="${idx}"
         trackListHTML += `
-            <li class="${isPlaying}${isSelected}" data-index="${t.globalIndex}" data-filepath="${t.file_path}">
+            <li class="${isPlaying}${isSelected}" data-index="${t.globalIndex}" data-album-index="${idx}" data-filepath="${t.file_path}">
                 <div>${t.track_num || '-'}</div>
                 <div class="track-title">${missingWarning}${t.title}</div>
                 <div>${t.duration}</div>
@@ -930,17 +947,41 @@ function openExpandedAlbum(albumData, cardElement) {
     const expandedList = document.getElementById('expanded-track-list');
     
     // --- UPDATED: Click Delegation with Header Bypass ---
+    // --- UPDATED: Grid-Specific Selection Engine ---
     expandedList.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         
-        // Ignore clicks if they didn't hit a list item, OR if they hit a disc header
         if (!li || li.classList.contains('disc-header')) return;
         
         if (!doubleClickOnTrackPossible) {
-            singleClickOnTrack(e); 
+            // NEW: Localized Grid Selection Logic
+            const trackAlbumIndex = parseInt(li.dataset.albumIndex);
+            const track = albumData.tracks[trackAlbumIndex];
+
+            if (e.shiftKey && lastGridClickedIndex !== null) {
+                const start = Math.min(lastGridClickedIndex, trackAlbumIndex);
+                const end = Math.max(lastGridClickedIndex, trackAlbumIndex);
+                if (!e.ctrlKey && !e.metaKey) { selectedPaths.clear(); }
+                
+                // Pull strictly from the visual album layout!
+                for (let i = start; i <= end; i++) {
+                    selectedPaths.add(albumData.tracks[i].file_path);
+                }
+            } else if (e.ctrlKey || e.metaKey) {
+                if (selectedPaths.has(track.file_path)) {
+                    selectedPaths.delete(track.file_path);
+                } else {
+                    selectedPaths.add(track.file_path);
+                }
+                lastGridClickedIndex = trackAlbumIndex;
+            } else {
+                selectedPaths.clear();
+                selectedPaths.add(track.file_path);
+                lastGridClickedIndex = trackAlbumIndex;
+            }
             
+            // Re-render visual highlights
             Array.from(expandedList.children).forEach(child => {
-                // Skip headers during highlighting
                 if (child.classList.contains('disc-header')) return; 
                 
                 if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
@@ -950,6 +991,7 @@ function openExpandedAlbum(albumData, cardElement) {
             doubleClickOnTrackPossible = true;
             setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
         } else {
+            // Double click: Still passes the globalIndex to the bouncer for seamless playback!
             window.getSelection().removeAllRanges(); 
             playbackContext = { type: 'album', key: albumData.key };
             requestPlayback(parseInt(li.dataset.index), 1, true);
@@ -1031,6 +1073,8 @@ document.addEventListener('click', (e) => {
     const isCard = e.target.closest('.album-card'); // Grid covers
     const isInteractive = e.target.closest('button, input, .player-bar, .app-header, .list-header, #context-menu'); 
     
+    
+
     // 2. If they clicked "empty space" (the background, a disc header, or empty grid padding)
     if (!isTrack && !isCard && !isInteractive) {
         
@@ -1038,6 +1082,7 @@ document.addEventListener('click', (e) => {
         if (selectedPaths.size > 0) {
             selectedPaths.clear();
             lastClickedIndex = null;
+            lastGridClickedIndex = null; // NEW: Clear grid anchor
             
             // Clear the visual highlight based on the active view
             if (currentView === 'list') {

@@ -7,21 +7,23 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+
     <header class="app-header">
       <div class="header-left">
-        <button id="prev-btn" class="icon-btn" title="Previous Track">
-          ⏮
-        </button>
-        <button id="play-pause-btn" title="Play/Pause">▶ Play</button>
-        <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+        <div class="playback-container">
+          <button id="prev-btn" class="icon-btn" title="Previous Track">⏮</button>
+          <button id="play-pause-btn" class="icon-btn" title="Play/Pause">▶</button>
+          <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+        </div>
+
         <div class="volume-container">
-          <button
+          <!-- <button
             id="normalize-btn"
             class="icon-btn"
             title="Toggle Volume Normalization"
           >
             🔊
-          </button>
+          </button> -->
           <input
             type="range"
             id="volume-bar"
@@ -34,23 +36,21 @@
       </div>
 
       <div class="header-center">
+
+        <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
         <div class="center-now-playing">
           <img
             id="np-cover"
-            src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>"
+            src="placeholder.png"
             alt="Cover"
           />
           <div class="np-info">
             <span id="np-title">No track selected</span>
             <span id="np-artist">-</span>
           </div>
-          <div class="center-modes">
-            <button id="shuffle-btn" class="icon-btn" title="Shuffle">
-              🔀
-            </button>
-            <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
-          </div>
         </div>
+        <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
+
         <div class="progress-container">
           <span id="current-time">0:00</span>
           <input
@@ -63,11 +63,12 @@
           />
           <span id="total-time">0:00</span>
         </div>
+
       </div>
 
       <div class="header-right">
         <input
-          type="text"
+          type="search"
           id="search-input"
           placeholder="Search library..."
           spellcheck="false"
@@ -104,11 +105,10 @@
     </main>
 
     <footer class="status-bar">
-      <div style="display: flex; gap: 15px; align-items: center">
+      <div>
         <button id="add-music-btn">Add Music</button>
-        <div id="status-text">0 tracks in library</div>
       </div>
-
+      <div id="status-text">0 tracks in library</div>
       <div class="view-toggles" style="display: flex; gap: 5px">
         <button id="toggle-list-btn" class="view-btn active">Songs</button>
         <button id="toggle-grid-btn" class="view-btn">Albums</button>
