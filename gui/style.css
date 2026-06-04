@@ -626,8 +626,6 @@ input[type="range"] {
     padding: 0;
 }
 
-
-
 .expanded-track-list li {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr) 50px;
@@ -641,11 +639,17 @@ input[type="range"] {
     border-radius: 4px;
 }
 
+.expanded-track-list li {
+    break-inside: avoid-column;
+    page-break-inside: avoid; /* Safari fallback */
+}
+
 .expanded-track-list li:hover { background-color: var(--bg-panel); }
 
 /* --- NEW: Disc Headers for Multi-Disc Albums --- */
 .expanded-track-list li.disc-header {
     grid-column: 1 / -1; /* Spans all columns in the row */
+    column-span: all; /* NEW: Forces the header to span across multi-column layouts */
     padding: 20px 15px 5px 15px;
     font-weight: bold;
     color: var(--text-main);
@@ -664,8 +668,8 @@ input[type="range"] {
 
 /* --- Two-Column Layout for Wide Grids --- */
 .expanded-track-list.two-column {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: block; /* Override default grid/flex behavior */
+    column-count: 2; /* Automatically balances content into two vertical columns */
     column-gap: 40px;
 }
 
