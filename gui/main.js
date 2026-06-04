@@ -1023,3 +1023,33 @@ function formatTotalSeconds(totalSecs) {
     if (h > 0) return `${h} hr ${m} min`;
     return `${m} min ${s} sec`;
 }
+
+// --- NEW: Global Deselection Logic ---
+document.addEventListener('click', (e) => {
+    // 1. Identify what the user just clicked on
+    const isTrack = e.target.closest('li:not(.disc-header)'); // Actual songs
+    const isCard = e.target.closest('.album-card'); // Grid covers
+    const isInteractive = e.target.closest('button, input, .player-bar, .app-header, .list-header, #context-menu'); 
+    
+    // 2. If they clicked "empty space" (the background, a disc header, or empty grid padding)
+    if (!isTrack && !isCard && !isInteractive) {
+        
+        // Only trigger DOM updates if there is actually a selection to clear
+        if (selectedPaths.size > 0) {
+            selectedPaths.clear();
+            lastClickedIndex = null;
+            
+            // Clear the visual highlight based on the active view
+            if (currentView === 'list') {
+                renderVirtualList();
+            } else {
+                const expandedList = document.getElementById('expanded-track-list');
+                if (expandedList) {
+                    Array.from(expandedList.children).forEach(child => {
+                        child.classList.remove('track-selected');
+                    });
+                }
+            }
+        }
+    }
+});
