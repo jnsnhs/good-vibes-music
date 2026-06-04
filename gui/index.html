@@ -109,9 +109,13 @@
         <button id="add-music-btn">Add Music</button>
       </div>
       <div id="status-text">0 tracks in library</div>
-      <div class="view-toggles" style="display: flex; gap: 5px">
-        <button id="toggle-list-btn" class="view-btn active">Songs</button>
-        <button id="toggle-grid-btn" class="view-btn">Albums</button>
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <button id="grid-settings-btn" class="icon-btn hidden" title="Grid Settings">⚙️</button>
+        
+        <div class="view-toggles" style="display: flex; gap: 5px">
+          <button id="toggle-list-btn" class="view-btn active">Songs</button>
+          <button id="toggle-grid-btn" class="view-btn">Albums</button>
+        </div>
       </div>
     </footer>
 
@@ -181,6 +185,38 @@
       </div>
       <div class="progress-bar-bg">
         <div id="import-progress-fill"></div>
+      </div>
+    </div>
+
+    <div id="grid-settings-modal" class="hidden">
+      <div class="modal-content" style="width: 350px;">
+        <h2>Album Grid Settings</h2>
+        
+        <div style="margin-bottom: 20px;">
+          <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Sort Order</label>
+          <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 13px; cursor: pointer;">
+              <input type="radio" name="grid-sort" value="artist" checked> Artist, then Year
+            </label>
+            <label style="font-size: 13px; cursor: pointer;">
+              <input type="radio" name="grid-sort" value="year"> Year, then Artist
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Display Options</label>
+          <div style="margin-top: 8px;">
+            <label style="font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="grid-show-subheadings"> Show Group Subheadings
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-cancel-grid-settings" class="secondary-btn">Cancel</button>
+          <button id="btn-save-grid-settings" class="primary-btn">Save</button>
+        </div>
       </div>
     </div>
 

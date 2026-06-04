@@ -677,6 +677,7 @@ const toggleGridBtn = document.getElementById('toggle-grid-btn');
 
 toggleListBtn.addEventListener('click', () => {
     currentView = 'list';
+    document.getElementById('grid-settings-btn').classList.add('hidden'); // Hide Cog
     toggleListBtn.classList.add('active');
     toggleGridBtn.classList.remove('active');
     gridViewWrapper.classList.add('hidden');
@@ -686,6 +687,7 @@ toggleListBtn.addEventListener('click', () => {
 
 toggleGridBtn.addEventListener('click', () => {
     currentView = 'grid';
+    document.getElementById('grid-settings-btn').classList.remove('hidden'); // Show Cog
     toggleGridBtn.classList.add('active');
     toggleListBtn.classList.remove('active');
     listViewWrapper.classList.add('hidden');
@@ -748,19 +750,24 @@ function processAlbums() {
     // This explicitly sorts the grid by Artist -> Year -> Album Title,
     // completely ignoring how the List View is currently sorted!
     gridAlbums.sort((a, b) => {
-        const artistA = (a.artist || '').toLowerCase();
-        const artistB = (b.artist || '').toLowerCase();
-        if (artistA !== artistB) return artistA.localeCompare(artistB);
-
-        // If artists match, sort chronologically
-        const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
-        const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
-        if (yearA !== yearB) return yearA - yearB;
-
-        // If years match, sort alphabetically by album title
-        const titleA = (a.title || '').toLowerCase();
-        const titleB = (b.title || '').toLowerCase();
-        return titleA.localeCompare(titleB);
+        if (gridSortOrder === 'year') {
+            const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
+            const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
+            if (yearA !== yearB) return yearA - yearB;
+            
+            const artistA = (a.artist || '').toLowerCase();
+            const artistB = (b.artist || '').toLowerCase();
+            if (artistA !== artistB) return artistA.localeCompare(artistB);
+        } else {
+            const artistA = (a.artist || '').toLowerCase();
+            const artistB = (b.artist || '').toLowerCase();
+            if (artistA !== artistB) return artistA.localeCompare(artistB);
+            
+            const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
+            const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
+            if (yearA !== yearB) return yearA - yearB;
+        }
+        return (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase());
     });
 }
 
@@ -787,8 +794,34 @@ function renderAlbumGrid() {
         });
     }, { root: document.getElementById('grid-view-wrapper'), rootMargin: '200px' });
 
-    gridAlbums.forEach((album, idx) => {
-        const card = document.createElement('div');
+    let currentGroup = null; // NEW: Tracks the current decade or letter
+
+gridAlbums.forEach((album, idx) => {
+    // --- NEW: Subheading Injection ---
+    if (showGridSubheadings) {
+        let albumGroup = "";
+        if (gridSortOrder === 'year') {
+            const year = Math.min(...album.tracks.map(t => parseInt(t.year) || 9999));
+            if (year === 9999) {
+                albumGroup = "Unknown Year";
+            } else {
+                const decade = Math.floor(year / 10) * 10;
+                albumGroup = `${String(decade).slice(-2)}s`; // Formats 1980 -> "80s"
+            }
+        } else {
+            const firstChar = (album.artist || "Unknown").trim().charAt(0).toUpperCase();
+            albumGroup = /[A-Z]/.test(firstChar) ? firstChar : "#"; // Groups symbols/numbers into #
+        }
+
+        if (albumGroup !== currentGroup) {
+            const heading = document.createElement('div');
+            heading.className = 'grid-subheading';
+            heading.innerText = albumGroup;
+            fragment.appendChild(heading);
+            currentGroup = albumGroup;
+        }
+    }
+    const card = document.createElement('div');
         card.className = 'album-card';
         card.dataset.index = idx;
         
@@ -860,9 +893,15 @@ function openExpandedAlbum(albumData, cardElement) {
             });
         }
     });
-    const genreString = genreSet.size > 0 ? Array.from(genreSet).join(', ') : "Unknown Genre";
+    let genreHTML = "";
+    if (genreSet.size > 0) {
+        Array.from(genreSet).forEach(g => {
+            genreHTML += `<span class="genre-tag">${g}</span>`;
+        });
+    }
 
     // Process Total Runtime
+// Process Total Runtime
     let totalSeconds = 0;
     albumData.tracks.forEach(t => {
         totalSeconds += parseDurationToSeconds(t.duration);
@@ -913,22 +952,24 @@ function openExpandedAlbum(albumData, cardElement) {
     // 3. DOM INJECTION
     // ==========================================
 
-    const expansionContainer = document.createElement('div');
+const expansionContainer = document.createElement('div');
     expansionContainer.className = 'album-expanded-row';
     expansionContainer.id = 'active-expansion-row';
 
-    // Inject the aggregated metadata directly under the title
     expansionContainer.innerHTML = `
         <div class="expanded-cover-container">
             <img id="expanded-highres-cover" src="${coverCache[albumData.coverPath] || 'placeholder.png'}">
+            <div class="expanded-cover-meta">
+                ${albumData.tracks.length} Tracks • ${runtimeString}
+            </div>
         </div>
         <div class="expanded-tracklist-container">
-            <h2 style="margin:0 0 5px 0;">${albumData.title}</h2>
-            <div style="color:var(--text-secondary); font-size:13px; margin-bottom:4px;">
-                ${albumData.artist} • ${albumData.tracks.length} Tracks • ${yearString}
+            <h2 style="margin:0 0 5px 0; font-size: 22px;">${albumData.title}</h2>
+            <div style="color:var(--text-secondary); font-size:14px; margin-bottom:12px;">
+                ${albumData.artist} • ${yearString}
             </div>
-            <div style="color:var(--text-muted); font-size:12px; margin-bottom:20px;">
-                ${genreString} • ${runtimeString}
+            <div style="margin-bottom:20px;">
+                ${genreHTML}
             </div>
             ${trackListHTML}
         </div>
@@ -1062,8 +1103,12 @@ function formatTotalSeconds(totalSecs) {
     const m = Math.floor((totalSecs % 3600) / 60);
     const s = totalSecs % 60;
     
-    if (h > 0) return `${h} hr ${m} min`;
-    return `${m} min ${s} sec`;
+    if (h > 0) {
+        if (m > 0 ) return `${h} hr ${m} min`;
+        return `${h} hr`;
+    }
+    if (s < 30) return `${m} min`;
+    return `${m+1} min`;
 }
 
 // --- NEW: Global Deselection Logic ---
@@ -1097,4 +1142,29 @@ document.addEventListener('click', (e) => {
             }
         }
     }
+});
+
+// --- NEW: Grid Settings State & Logic ---
+let gridSortOrder = 'artist'; // 'artist' or 'year'
+let showGridSubheadings = false;
+
+const gridSettingsModal = document.getElementById('grid-settings-modal');
+
+document.getElementById('grid-settings-btn').addEventListener('click', () => {
+    // Populate modal with current state
+    document.querySelector(`input[name="grid-sort"][value="${gridSortOrder}"]`).checked = true;
+    document.getElementById('grid-show-subheadings').checked = showGridSubheadings;
+    gridSettingsModal.classList.remove('hidden');
+});
+
+document.getElementById('btn-cancel-grid-settings').addEventListener('click', () => {
+    gridSettingsModal.classList.add('hidden');
+});
+
+document.getElementById('btn-save-grid-settings').addEventListener('click', () => {
+    gridSortOrder = document.querySelector('input[name="grid-sort"]:checked').value;
+    showGridSubheadings = document.getElementById('grid-show-subheadings').checked;
+    
+    gridSettingsModal.classList.add('hidden');
+    renderAlbumGrid(); // Re-sort and re-render instantly!
 });
