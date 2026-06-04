@@ -806,30 +806,78 @@ function renderAlbumGrid() {
 
 // 3. The Inline Expansion Logic
 function openExpandedAlbum(albumData, cardElement) {
-    closeExpandedAlbum(); // Clean up existing
+    closeExpandedAlbum(); 
     
     activeExpandedCard = cardElement;
     cardElement.classList.add('active-card');
 
-    // Mathematically find the end of the visual row
     const cards = Array.from(albumGrid.querySelectorAll('.album-card'));
     const clickedIndex = cards.indexOf(cardElement);
     const clickedTop = cardElement.offsetTop;
     
     let insertIndex = clickedIndex;
-    // Look ahead: as long as the next card has the same Y position, it's in the same row
     while (insertIndex + 1 < cards.length && cards[insertIndex + 1].offsetTop === clickedTop) {
         insertIndex++;
     }
 
-    // Build the Expansion DOM
-    const expansionContainer = document.createElement('div');
-    expansionContainer.className = 'album-expanded-row';
-    expansionContainer.id = 'active-expansion-row';
+    // ==========================================
+    // 1. DYNAMIC METADATA AGGREGATION
+    // ==========================================
+    
+    // Process Years
+    const validYears = albumData.tracks.map(t => parseInt(t.year)).filter(y => !isNaN(y) && y > 0);
+    let yearString = "Unknown Year";
+    if (validYears.length > 0) {
+        const minYear = Math.min(...validYears);
+        const maxYear = Math.max(...validYears);
+        yearString = minYear === maxYear ? `${minYear}` : `${minYear} - ${maxYear}`;
+    }
 
-    // Build the tracklist HTML
-    let trackListHTML = '<ul class="expanded-track-list" id="expanded-track-list">';
+    // Process Genres (Splitting CSVs and deduplicating via Set)
+    const genreSet = new Set();
     albumData.tracks.forEach(t => {
+        if (t.genre) {
+            t.genre.split(',').forEach(g => {
+                const trimmed = g.trim();
+                if (trimmed) genreSet.add(trimmed);
+            });
+        }
+    });
+    const genreString = genreSet.size > 0 ? Array.from(genreSet).join(', ') : "Unknown Genre";
+
+    // Process Total Runtime
+    let totalSeconds = 0;
+    albumData.tracks.forEach(t => {
+        totalSeconds += parseDurationToSeconds(t.duration);
+    });
+    const runtimeString = formatTotalSeconds(totalSeconds);
+
+    // ==========================================
+    // 2. TRACKLIST & MULTI-DISC GENERATION
+    // ==========================================
+    
+    // Check if album actually spans multiple discs
+    const uniqueDiscs = new Set(albumData.tracks.map(t => parseInt(t.disc_num) || 1));
+    const hasMultipleDiscs = uniqueDiscs.size > 1;
+
+    // --- NEW: Calculate Grid Columns ---
+    // We count how many cards share the same Y position (offsetTop) as the very first card.
+    const firstRowY = cards[0].offsetTop;
+    const currentColumns = cards.filter(c => c.offsetTop === firstRowY).length;
+    
+    // Apply two-column class if conditions are met
+    const useTwoColumns = currentColumns > 4 && albumData.tracks.length > 4;
+    let trackListHTML = `<ul class="expanded-track-list ${useTwoColumns ? 'two-column' : ''}" id="expanded-track-list">`;    let currentDisc = null;
+
+    albumData.tracks.forEach(t => {
+        const trackDisc = parseInt(t.disc_num) || 1;
+        
+        // Inject Disc Header if it's a new disc in a multi-disc album
+        if (hasMultipleDiscs && trackDisc !== currentDisc) {
+            trackListHTML += `<li class="disc-header">Disc ${trackDisc}</li>`;
+            currentDisc = trackDisc;
+        }
+
         const isPlaying = (currentPlayingPath && t.file_path === currentPlayingPath) ? ' track-playing' : '';
         const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
         const missingWarning = t.missing ? '⚠️ ' : '';
@@ -844,42 +892,57 @@ function openExpandedAlbum(albumData, cardElement) {
     });
     trackListHTML += '</ul>';
 
+    // ==========================================
+    // 3. DOM INJECTION
+    // ==========================================
+
+    const expansionContainer = document.createElement('div');
+    expansionContainer.className = 'album-expanded-row';
+    expansionContainer.id = 'active-expansion-row';
+
+    // Inject the aggregated metadata directly under the title
     expansionContainer.innerHTML = `
         <div class="expanded-cover-container">
             <img id="expanded-highres-cover" src="${coverCache[albumData.coverPath] || 'placeholder.png'}">
         </div>
         <div class="expanded-tracklist-container">
             <h2 style="margin:0 0 5px 0;">${albumData.title}</h2>
-            <div style="color:var(--text-secondary); font-size:13px; margin-bottom:15px;">${albumData.artist} • ${albumData.tracks.length} Tracks</div>
+            <div style="color:var(--text-secondary); font-size:13px; margin-bottom:4px;">
+                ${albumData.artist} • ${albumData.tracks.length} Tracks • ${yearString}
+            </div>
+            <div style="color:var(--text-muted); font-size:12px; margin-bottom:20px;">
+                ${genreString} • ${runtimeString}
+            </div>
             ${trackListHTML}
         </div>
     `;
 
-    // Insert directly after the last item in the row
     if (insertIndex === cards.length - 1) {
         albumGrid.appendChild(expansionContainer);
     } else {
         albumGrid.insertBefore(expansionContainer, cards[insertIndex + 1]);
     }
 
-    // Attempt to load a high-res cover just in case
     getTrackCover(albumData.coverPath).then(src => {
         document.getElementById('expanded-highres-cover').src = src;
     });
 
-    // --- UPDATED: Wire up Clicks and Context Menu ---
     const expandedList = document.getElementById('expanded-track-list');
     
-    // Left & Double Clicks
+    // --- UPDATED: Click Delegation with Header Bypass ---
     expandedList.addEventListener('click', (e) => {
         const li = e.target.closest('li');
-        if (!li) return;
+        
+        // Ignore clicks if they didn't hit a list item, OR if they hit a disc header
+        if (!li || li.classList.contains('disc-header')) return;
         
         if (!doubleClickOnTrackPossible) {
             singleClickOnTrack(e); 
             
-            // Re-render the inner list to show the selection highlight
             Array.from(expandedList.children).forEach(child => {
+                // Skip headers during highlighting
+                if (child.classList.contains('disc-header')) return; 
+                
                 if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
                 else child.classList.remove('track-selected');
             });
@@ -888,17 +951,17 @@ function openExpandedAlbum(albumData, cardElement) {
             setTimeout(() => { doubleClickOnTrackPossible = false; }, doubleClickDelay);
         } else {
             window.getSelection().removeAllRanges(); 
-            // NEW: Set the playback context to THIS album!
             playbackContext = { type: 'album', key: albumData.key };
             requestPlayback(parseInt(li.dataset.index), 1, true);
         }    
     });
 
-    // NEW: Right-Click Context Menu in Grid
     expandedList.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const li = e.target.closest('li');
-        if (li) {
+        
+        // Ignore right-clicks on disc headers
+        if (li && !li.classList.contains('disc-header')) {
             const trackIndex = parseInt(li.dataset.index);
             const track = libraryData[trackIndex];
             
@@ -907,6 +970,7 @@ function openExpandedAlbum(albumData, cardElement) {
                 selectedPaths.add(track.file_path);
                 
                 Array.from(expandedList.children).forEach(child => {
+                    if (child.classList.contains('disc-header')) return;
                     if (selectedPaths.has(child.dataset.filepath)) child.classList.add('track-selected');
                     else child.classList.remove('track-selected');
                 });
@@ -918,7 +982,6 @@ function openExpandedAlbum(albumData, cardElement) {
         }
     });
     
-    // Smooth scroll into view
     setTimeout(() => {
         expansionContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 50);
@@ -937,3 +1000,26 @@ window.addEventListener('resize', () => {
         closeExpandedAlbum();
     }
 });
+
+// --- NEW: Album Metadata Calculators ---
+
+// Converts MM:SS or HH:MM:SS strings into total seconds
+function parseDurationToSeconds(durationStr) {
+    if (!durationStr) return 0;
+    const parts = durationStr.split(':').reverse();
+    let secs = 0;
+    if (parts[0]) secs += parseInt(parts[0]) || 0; // Seconds
+    if (parts[1]) secs += (parseInt(parts[1]) || 0) * 60; // Minutes
+    if (parts[2]) secs += (parseInt(parts[2]) || 0) * 3600; // Hours
+    return secs;
+}
+
+// Converts raw seconds into a readable album total (e.g. "1 hr 15 min" or "45 min 30 sec")
+function formatTotalSeconds(totalSecs) {
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    
+    if (h > 0) return `${h} hr ${m} min`;
+    return `${m} min ${s} sec`;
+}

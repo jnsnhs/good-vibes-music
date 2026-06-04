@@ -3,8 +3,6 @@
    ========================================= */
 :root {
   --green: #1db954;
-  --purple: #a855f7;
-  --purple-hover: #c084fc;
   --bg-main: #121212;
   --bg-panel: #181818;
   --bg-hover: #2a2a2a;
@@ -62,6 +60,7 @@ body {
   height: 75px;
   box-sizing: border-box;
   transition: background-color 0.3s;
+  border-top: 1px solid var(--border-color);
 }
 
 .header-left {
@@ -627,6 +626,8 @@ input[type="range"] {
     padding: 0;
 }
 
+
+
 .expanded-track-list li {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr) 50px;
@@ -641,7 +642,32 @@ input[type="range"] {
 }
 
 .expanded-track-list li:hover { background-color: var(--bg-panel); }
+
+/* --- NEW: Disc Headers for Multi-Disc Albums --- */
+.expanded-track-list li.disc-header {
+    grid-column: 1 / -1; /* Spans all columns in the row */
+    padding: 20px 15px 5px 15px;
+    font-weight: bold;
+    color: var(--text-main);
+    border-bottom: none;
+    cursor: default;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+.expanded-track-list li.disc-header:hover {
+    background-color: transparent; /* Disable hover effect for headers */
+}
+
 .expanded-track-list li .track-title { color: var(--text-main); }
+
+/* --- Two-Column Layout for Wide Grids --- */
+.expanded-track-list.two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 40px;
+}
 
 /* --- Textual Toggle Buttons --- */
 .view-btn {
