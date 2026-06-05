@@ -11,45 +11,29 @@
     <header class="app-header">
       <div class="header-left">
         <div class="playback-container">
-          <button id="prev-btn" class="icon-btn" title="Previous Track">⏮</button>
-          <button id="play-pause-btn" class="icon-btn" title="Play/Pause">▶</button>
-          <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
-        </div>
 
-        <div class="volume-container">
-          <!-- <button
-            id="normalize-btn"
-            class="icon-btn"
-            title="Toggle Volume Normalization"
-          >
-            🔊
-          </button> -->
-          <input
-            type="range"
-            id="volume-bar"
-            min="0"
-            max="1"
-            step="0.01"
-            value="1"
-          />
+          <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
+          <button id="prev-btn" class="icon-btn" title="Previous Track">
+            ⏮
+          </button>
+          <button id="play-pause-btn" class="icon-btn" title="Play/Pause">
+            ▶
+          </button>
+          <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+          <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
         </div>
       </div>
 
       <div class="header-center">
-
-        <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
         <div class="center-now-playing">
-          <img
-            id="np-cover"
-            src="placeholder.png"
-            alt="Cover"
-          />
+          <img id="np-cover" src="placeholder.png" alt="Cover" />
           <div class="np-info">
-            <span id="np-title">No track selected</span>
+            <span id="np-title"
+              >No track selected</span
+            >
             <span id="np-artist">-</span>
           </div>
         </div>
-        <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
 
         <div class="progress-container">
           <span id="current-time">0:00</span>
@@ -63,16 +47,27 @@
           />
           <span id="total-time">0:00</span>
         </div>
-
       </div>
 
       <div class="header-right">
-        <input
-          type="search"
-          id="search-input"
-          placeholder="Search library..."
-          spellcheck="false"
-        />
+        <div class="volume-container">
+          <button
+            id="normalize-btn"
+            class="icon-btn"
+            title="Toggle Volume Normalization"
+          >
+            🔊
+          </button>
+          <input
+            type="range"
+            id="volume-bar"
+            min="0"
+            max="1"
+            step="0.01"
+            value="1"
+          />
+        </div>
+        
       </div>
     </header>
 
@@ -105,6 +100,12 @@
     </main>
 
     <footer class="status-bar">
+      <input
+          type="search"
+          id="search-input"
+          placeholder="Search library..."
+          spellcheck="false"
+        />
       <div>
         <button id="add-music-btn">Add Music</button>
       </div>
