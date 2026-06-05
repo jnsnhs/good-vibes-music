@@ -816,6 +816,12 @@ gridAlbums.forEach((album, idx) => {
         if (albumGroup !== currentGroup) {
             const heading = document.createElement('div');
             heading.className = 'grid-subheading';
+            
+            // NEW: Apply sticky class if enabled
+            if (stickyGridSubheadings) {
+                heading.classList.add('sticky');
+            }
+            
             heading.innerText = albumGroup;
             fragment.appendChild(heading);
             currentGroup = albumGroup;
@@ -925,7 +931,7 @@ function openExpandedAlbum(albumData, cardElement) {
     
     // Calculate the mathematical column count currently rendered by the browser
     const currentColumns = Math.round(gridWidth / cardWidth);
-            
+
     // Apply two-column class if conditions are met
     const useTwoColumns = currentColumns > 4 && albumData.tracks.length > 4;
     let trackListHTML = `<ul class="expanded-track-list ${useTwoColumns ? 'two-column' : ''}" id="expanded-track-list">`;    let currentDisc = null;
@@ -1152,13 +1158,14 @@ document.addEventListener('click', (e) => {
 // --- NEW: Grid Settings State & Logic ---
 let gridSortOrder = 'artist'; // 'artist' or 'year'
 let showGridSubheadings = false;
+let stickyGridSubheadings = false; // NEW: Tracks the sticky state
 
 const gridSettingsModal = document.getElementById('grid-settings-modal');
 
 document.getElementById('grid-settings-btn').addEventListener('click', () => {
-    // Populate modal with current state
     document.querySelector(`input[name="grid-sort"][value="${gridSortOrder}"]`).checked = true;
     document.getElementById('grid-show-subheadings').checked = showGridSubheadings;
+    document.getElementById('grid-sticky-subheadings').checked = stickyGridSubheadings; // NEW
     gridSettingsModal.classList.remove('hidden');
 });
 
@@ -1169,7 +1176,8 @@ document.getElementById('btn-cancel-grid-settings').addEventListener('click', ()
 document.getElementById('btn-save-grid-settings').addEventListener('click', () => {
     gridSortOrder = document.querySelector('input[name="grid-sort"]:checked').value;
     showGridSubheadings = document.getElementById('grid-show-subheadings').checked;
+    stickyGridSubheadings = document.getElementById('grid-sticky-subheadings').checked; // NEW
     
     gridSettingsModal.classList.add('hidden');
-    renderAlbumGrid(); // Re-sort and re-render instantly!
+    renderAlbumGrid(); 
 });

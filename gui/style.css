@@ -75,6 +75,7 @@ body {
   transition: background-color 0.3s;
   border-top: 1px solid var(--border-color);
   box-shadow: 0px -5px 10px 10px rgba(0, 0, 0, 0.10);
+  z-index: 99;
 }
 
 .header-left {
@@ -788,14 +789,22 @@ input[type="range"] {
    ========================================= */
 
 .grid-subheading {
-  grid-column: 1 / -1; /* Forces subheading to span entire grid row */
+  grid-column: 1 / -1; 
   font-size: 18px;
   font-weight: bold;
   color: var(--text-main);
-  padding: 20px 10px 5px 10px;
+  /* UPDATED: Converted margin-top to padding-top so the background is solid when sticky */
+  padding: 30px 10px 5px 10px; 
   border-bottom: 2px solid var(--border-color);
-  margin-top: 10px;
   margin-bottom: 5px;
+}
+
+/* NEW: Sticky Modifier Class */
+.grid-subheading.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10; /* Keeps it above the album cards */
+  background-color: var(--bg-main); /* Matches the app background perfectly */
 }
 
 .genre-tag {
