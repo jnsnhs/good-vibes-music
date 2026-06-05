@@ -74,6 +74,7 @@ body {
   box-sizing: border-box;
   transition: background-color 0.3s;
   border-top: 1px solid var(--border-color);
+  box-shadow: 0px -5px 10px 10px rgba(0, 0, 0, 0.10);
 }
 
 .header-left {
@@ -532,6 +533,7 @@ button {
   transition: background-color 0.3s;
   font-size: 12px;
   color: var(--text-secondary);
+  box-shadow: 0px 5px 10px 10px rgba(0, 0, 0, 0.10);
 }
 
 #add-music-btn {
@@ -698,15 +700,15 @@ input[type="range"] {
    ========================================= */
 
 ::-webkit-scrollbar {
-  width: 12px;
+  width: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
-  border-radius: 6px;
-  border: 3px solid var(--bg-main);
+  border-radius: 10px;
+  /* border: 3px solid var(--bg-main); */
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-muted);
@@ -826,9 +828,4 @@ input[type="range"] {
   justify-content: center;
   align-items: center;
   z-index: 2000;
-}
-
-main {
-  background-color: red;
-  border: 5px solid blue;
 }
