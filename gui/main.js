@@ -750,23 +750,32 @@ function processAlbums() {
     // This explicitly sorts the grid by Artist -> Year -> Album Title,
     // completely ignoring how the List View is currently sorted!
     gridAlbums.sort((a, b) => {
+        // Multiplier: 1 for Ascending, -1 for Descending
+        const dir = gridSortDirection === 'desc' ? -1 : 1;
+
         if (gridSortOrder === 'year') {
+            // Primary: Year (Affected by Direction)
             const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
             const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
-            if (yearA !== yearB) return yearA - yearB;
+            if (yearA !== yearB) return (yearA - yearB) * dir;
             
+            // Secondary: Artist (Always A-Z)
             const artistA = (a.artist || '').toLowerCase();
             const artistB = (b.artist || '').toLowerCase();
             if (artistA !== artistB) return artistA.localeCompare(artistB);
         } else {
+            // Primary: Artist (Affected by Direction)
             const artistA = (a.artist || '').toLowerCase();
             const artistB = (b.artist || '').toLowerCase();
-            if (artistA !== artistB) return artistA.localeCompare(artistB);
+            if (artistA !== artistB) return artistA.localeCompare(artistB) * dir;
             
+            // Secondary: Year (Always Chronological)
             const yearA = Math.min(...a.tracks.map(t => parseInt(t.year) || 9999));
             const yearB = Math.min(...b.tracks.map(t => parseInt(t.year) || 9999));
             if (yearA !== yearB) return yearA - yearB;
         }
+        
+        // Tertiary: Album Title (Always A-Z)
         return (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase());
     });
 }
@@ -1157,6 +1166,7 @@ document.addEventListener('click', (e) => {
 
 // --- NEW: Grid Settings State & Logic ---
 let gridSortOrder = 'artist'; // 'artist' or 'year'
+let gridSortDirection = 'asc'; // NEW: 'asc' or 'desc'
 let showGridSubheadings = false;
 let stickyGridSubheadings = false; // NEW: Tracks the sticky state
 
@@ -1164,8 +1174,9 @@ const gridSettingsModal = document.getElementById('grid-settings-modal');
 
 document.getElementById('grid-settings-btn').addEventListener('click', () => {
     document.querySelector(`input[name="grid-sort"][value="${gridSortOrder}"]`).checked = true;
+    document.querySelector(`input[name="grid-sort-dir"][value="${gridSortDirection}"]`).checked = true; // NEW
     document.getElementById('grid-show-subheadings').checked = showGridSubheadings;
-    document.getElementById('grid-sticky-subheadings').checked = stickyGridSubheadings; // NEW
+    document.getElementById('grid-sticky-subheadings').checked = stickyGridSubheadings;
     gridSettingsModal.classList.remove('hidden');
 });
 
@@ -1175,8 +1186,9 @@ document.getElementById('btn-cancel-grid-settings').addEventListener('click', ()
 
 document.getElementById('btn-save-grid-settings').addEventListener('click', () => {
     gridSortOrder = document.querySelector('input[name="grid-sort"]:checked').value;
+    gridSortDirection = document.querySelector('input[name="grid-sort-dir"]:checked').value; // NEW
     showGridSubheadings = document.getElementById('grid-show-subheadings').checked;
-    stickyGridSubheadings = document.getElementById('grid-sticky-subheadings').checked; // NEW
+    stickyGridSubheadings = document.getElementById('grid-sticky-subheadings').checked;
     
     gridSettingsModal.classList.add('hidden');
     renderAlbumGrid(); 
