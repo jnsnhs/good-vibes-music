@@ -916,11 +916,16 @@ function openExpandedAlbum(albumData, cardElement) {
     const uniqueDiscs = new Set(albumData.tracks.map(t => parseInt(t.disc_num) || 1));
     const hasMultipleDiscs = uniqueDiscs.size > 1;
 
-    // --- NEW: Calculate Grid Columns ---
-    // We count how many cards share the same Y position (offsetTop) as the very first card.
-    const firstRowY = cards[0].offsetTop;
-    const currentColumns = cards.filter(c => c.offsetTop === firstRowY).length;
+// --- FIXED: Dimension-Based Column Calculation ---
+    // We calculate how many columns fit by dividing the total grid width by an individual card's width.
+    // This is 100% immune to offsetTop shifts, subheadings, or expansion container placements.
+    const albumGridElement = document.getElementById('album-grid');
+    const gridWidth = albumGridElement.clientWidth;
+    const cardWidth = cardElement.getBoundingClientRect().width || 180; // Fallback to a standard card width if 0
     
+    // Calculate the mathematical column count currently rendered by the browser
+    const currentColumns = Math.round(gridWidth / cardWidth);
+            
     // Apply two-column class if conditions are met
     const useTwoColumns = currentColumns > 4 && albumData.tracks.length > 4;
     let trackListHTML = `<ul class="expanded-track-list ${useTwoColumns ? 'two-column' : ''}" id="expanded-track-list">`;    let currentDisc = null;
@@ -952,9 +957,9 @@ function openExpandedAlbum(albumData, cardElement) {
     // 3. DOM INJECTION
     // ==========================================
 
-const expansionContainer = document.createElement('div');
-    expansionContainer.className = 'album-expanded-row';
-    expansionContainer.id = 'active-expansion-row';
+    const expansionContainer = document.createElement('div');
+        expansionContainer.className = 'album-expanded-row';
+        expansionContainer.id = 'active-expansion-row';
 
     expansionContainer.innerHTML = `
         <div class="expanded-cover-container">
@@ -975,11 +980,11 @@ const expansionContainer = document.createElement('div');
         </div>
     `;
 
-    if (insertIndex === cards.length - 1) {
-        albumGrid.appendChild(expansionContainer);
-    } else {
-        albumGrid.insertBefore(expansionContainer, cards[insertIndex + 1]);
-    }
+    // We insert the expansion container immediately AFTER the last card in the current row.
+    // If nextSibling is a subheading, it inserts before the subheading.
+    // If nextSibling is null (end of list), it naturally appends to the bottom.
+    const lastCardInRow = cards[insertIndex];
+    albumGrid.insertBefore(expansionContainer, lastCardInRow.nextSibling);
 
     getTrackCover(albumData.coverPath).then(src => {
         document.getElementById('expanded-highres-cover').src = src;

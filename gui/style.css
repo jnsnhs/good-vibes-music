@@ -827,3 +827,8 @@ input[type="range"] {
   align-items: center;
   z-index: 2000;
 }
+
+main {
+  background-color: red;
+  border: 5px solid blue;
+}
