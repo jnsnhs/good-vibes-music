@@ -32,6 +32,57 @@ document.addEventListener('contextmenu', (e) => {
     // Otherwise, this stops it globally.
 });
 
+// ==========================================
+// GLOBAL KEYBOARD SHORTCUTS
+// ==========================================
+document.addEventListener('keydown', (e) => {
+    // Shared check: Ensure NO modals are currently open
+    const modalIds = ['grid-settings-modal', 'edit-modal-overlay'];
+    const isModalOpen = modalIds.some(id => {
+        const modal = document.getElementById(id);
+        return modal && !modal.classList.contains('hidden');
+    });
+
+    // 1. Search Shortcut (Ctrl+F or Cmd+F)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        if (!isModalOpen) {
+            e.preventDefault(); 
+            
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select(); 
+            }
+        }
+    }
+
+    // 2. Play/Pause Shortcut (Spacebar)
+    if (e.code === 'Space') {
+        const activeEl = document.activeElement;
+        const activeTag = activeEl.tagName;
+        
+        // FIX: Treat text inputs and textareas as "typing", but EXCLUDE range sliders (volume/progress)
+        const isTyping = (activeTag === 'INPUT' && activeEl.type !== 'range') || activeTag === 'TEXTAREA';
+
+        if (!isModalOpen && !isTyping) {
+            e.preventDefault(); // Prevents page scrolling AND stops slider-hijacking
+            
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            if (playPauseBtn) {
+                playPauseBtn.click();
+            }
+        }
+    }
+});
+
+// --- NEW: Focus Release for Range Sliders ---
+// Automatically blurs the volume and progress bars as soon as the user finishes adjusting them
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+    slider.addEventListener('pointerup', () => {
+        slider.blur();
+    });
+});
+
 // Dynamic Status Bar Count Handler
 function updateStatusCount() {
     const statusText = document.getElementById('status-text');
