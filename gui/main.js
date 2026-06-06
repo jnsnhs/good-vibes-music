@@ -295,43 +295,168 @@ document.getElementById('ctx-remove').addEventListener('click', async () => {
     }
 });
 
-// --- UPDATED: Debounced Search & Expanded Filter Fields ---
+// --- UPDATED: Advanced Filtering & Search Syntax ---
 let searchTimeout; // Variable to hold the debounce timer
 
+// 1. Custom Parser: Safely tokenizes the string while respecting quotes and pipes
+function parseSearchQuery(queryString) {
+    const groups = [];
+    let currentGroup = [];
+    let currentToken = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < queryString.length; i++) {
+        const char = queryString[i];
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+            currentToken += char; // Keep quotes for stripping later
+        } else if (char === '|' && !inQuotes) {
+            // Pipe indicates a new OR group
+            if (currentToken.trim()) {
+                currentGroup.push(currentToken.trim());
+                currentToken = '';
+            }
+            if (currentGroup.length > 0) {
+                groups.push(currentGroup);
+                currentGroup = [];
+            }
+        } else if (char === ' ' && !inQuotes) {
+            // Space indicates a new AND token within the current group
+            if (currentToken.trim()) {
+                currentGroup.push(currentToken.trim());
+                currentToken = '';
+            }
+        } else {
+            currentToken += char;
+        }
+    }
+    
+    // Push the final dangling tokens and groups
+    if (currentToken.trim()) currentGroup.push(currentToken.trim());
+    if (currentGroup.length > 0) groups.push(currentGroup);
+    
+    return groups;
+}
+
+// 2. Condition Builder: Converts a string token into a logical object
+function buildCondition(token) {
+    let isNegated = false;
+    let rawToken = token;
+
+    // Detect Negation
+    if (rawToken.startsWith('-')) {
+        isNegated = true;
+        rawToken = rawToken.substring(1);
+    }
+
+    // Regex to match field searches (e.g., artist="elton john", year>1980)
+    // Allowed operators: =, >, <
+    const match = rawToken.match(/^([a-z_]+)([=><])(.+)$/i);
+
+    let field = null;
+    let operator = null;
+    let value = rawToken;
+
+    if (match) {
+        let parsedField = match[1].toLowerCase();
+        operator = match[2];
+        value = match[3];
+
+        // Map Aliases
+        const aliases = {
+            'style': 'genre',
+            'song': 'title',
+            'release': 'year',
+            'albumartist': 'album_artist'
+        };
+        if (aliases[parsedField]) parsedField = aliases[parsedField];
+
+        // Validate the requested field
+        const validFields = ['artist', 'title', 'album', 'album_artist', 'genre', 'year'];
+        if (validFields.includes(parsedField)) {
+            field = parsedField;
+        } else {
+            // If the user types an invalid field (e.g., food=pizza), treat it as a standard global text search
+            value = rawToken;
+        }
+    }
+
+    // Strip surrounding quotes if the user encapsulated their string
+    if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.substring(1, value.length - 1);
+    }
+
+    value = value.toLowerCase();
+
+    return { isNegated, field, operator, value };
+}
+
+// 3. Condition Evaluator: Checks if a single track passes a single condition
+function evaluateCondition(track, condition) {
+    const { isNegated, field, operator, value } = condition;
+    let isMatch = false;
+
+    if (field) {
+        let trackVal = track[field] || '';
+
+        if (field === 'year') {
+            const tYear = parseInt(trackVal) || 0;
+            const vYear = parseInt(value) || 0;
+            
+            if (operator === '=') isMatch = tYear === vYear;
+            else if (operator === '>') isMatch = tYear > vYear;
+            else if (operator === '<') isMatch = tYear < vYear;
+        } else {
+            // For string metadata (artist, title, etc.), we default to 'includes' logic
+            trackVal = trackVal.toString().toLowerCase();
+            isMatch = trackVal.includes(value); 
+        }
+    } else {
+        // Fallback: Global Text Search
+        const yearStr = track.year ? track.year.toString() : '';
+        const searchableText = [
+            track.title || '',
+            track.artist || '',
+            track.album || '',
+            track.album_artist || '',
+            track.genre || '',
+            yearStr
+        ].join(' ').toLowerCase();
+
+        isMatch = searchableText.includes(value);
+    }
+
+    return isNegated ? !isMatch : isMatch;
+}
+
+// 4. The Main Listener
 document.getElementById('search-input').addEventListener('input', (e) => {
-    // 1. Clear the previous timer if the user types another letter
     clearTimeout(searchTimeout);
 
-    // 2. Set a new timer to wait before executing the filter
     searchTimeout = setTimeout(() => {
-        const query = e.target.value.toLowerCase().trim();
+        const query = e.target.value.trim();
         
         if (query === '') {
             libraryData = [...masterLibraryData];
         } else {
-            const searchTerms = query.split(/\s+/);
+            // Step A: Parse query into nested structure -> OR Groups containing AND tokens
+            const parsedGroups = parseSearchQuery(query);
             
+            // Step B: Convert raw strings into logical objects
+            const conditionGroups = parsedGroups.map(group => group.map(buildCondition));
+            
+            // Step C: Execute the filter against the library
             libraryData = masterLibraryData.filter(track => {
-                // Safely extract the year as a string for general text filtering.
-                // (We will expand on its integer nature when we build the advanced syntax).
-                const yearStr = track.year ? track.year.toString() : '';
-                
-                // Aggregate all searchable fields into one massive string per track
-                const searchableText = [
-                    track.title || '',
-                    track.artist || '',
-                    track.album || '',
-                    track.album_artist || '',
-                    track.genre || '',
-                    yearStr
-                ].join(' ').toLowerCase();
-                
-                // Ensure EVERY term the user typed exists somewhere in the track's aggregated metadata
-                return searchTerms.every(term => searchableText.includes(term));
+                // A track passes if it satisfies AT LEAST ONE OR-group (The | operator)
+                return conditionGroups.some(group => {
+                    // Within a group, a track must satisfy EVERY AND-condition (Space separation)
+                    return group.every(condition => evaluateCondition(track, condition));
+                });
             });
         }
         
-        // Reset scroll position and update the correct view
+        // Reset scroll position and re-render the active view
         document.getElementById('track-list-container').scrollTop = 0;
         
         if (currentView === 'list') {
@@ -339,7 +464,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
         } else {
             renderAlbumGrid();
         }
-    }, 300); // 300 milliseconds is the standard UI "sweet spot" for typing pauses
+    }, 300); 
 });
 
 function playTrack(track, coverSrc) {
