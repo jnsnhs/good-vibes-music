@@ -90,6 +90,7 @@ window.addEventListener('pywebviewready', async () => {
 });
 
 const addMusicBtn = document.getElementById('add-music-btn');
+
 addMusicBtn.addEventListener('click', async () => {
     const response = await window.pywebview.api.add_music();
     
@@ -294,19 +295,51 @@ document.getElementById('ctx-remove').addEventListener('click', async () => {
     }
 });
 
+// --- UPDATED: Debounced Search & Expanded Filter Fields ---
+let searchTimeout; // Variable to hold the debounce timer
+
 document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    if (query === '') {
-        libraryData = [...masterLibraryData];
-    } else {
-        const searchTerms = query.split(/\s+/);
-        libraryData = masterLibraryData.filter(track => {
-            const searchableText = `${track.title || ''} ${track.artist || ''} ${track.album || ''}`.toLowerCase();
-            return searchTerms.every(term => searchableText.includes(term));
-        });
-    }
-    document.getElementById('track-list-container').scrollTop = 0;
-    renderVirtualList();
+    // 1. Clear the previous timer if the user types another letter
+    clearTimeout(searchTimeout);
+
+    // 2. Set a new timer to wait before executing the filter
+    searchTimeout = setTimeout(() => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        if (query === '') {
+            libraryData = [...masterLibraryData];
+        } else {
+            const searchTerms = query.split(/\s+/);
+            
+            libraryData = masterLibraryData.filter(track => {
+                // Safely extract the year as a string for general text filtering.
+                // (We will expand on its integer nature when we build the advanced syntax).
+                const yearStr = track.year ? track.year.toString() : '';
+                
+                // Aggregate all searchable fields into one massive string per track
+                const searchableText = [
+                    track.title || '',
+                    track.artist || '',
+                    track.album || '',
+                    track.album_artist || '',
+                    track.genre || '',
+                    yearStr
+                ].join(' ').toLowerCase();
+                
+                // Ensure EVERY term the user typed exists somewhere in the track's aggregated metadata
+                return searchTerms.every(term => searchableText.includes(term));
+            });
+        }
+        
+        // Reset scroll position and update the correct view
+        document.getElementById('track-list-container').scrollTop = 0;
+        
+        if (currentView === 'list') {
+            renderVirtualList();
+        } else {
+            renderAlbumGrid();
+        }
+    }, 300); // 300 milliseconds is the standard UI "sweet spot" for typing pauses
 });
 
 function playTrack(track, coverSrc) {

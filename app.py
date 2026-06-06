@@ -407,7 +407,7 @@ if __name__ == '__main__':
     start_audio_server()     
     api = Api()
     window = webview.create_window(
-        title='GoodVibes',
+        title='Good Vibes',
         url='gui/index.html',
         js_api=api, 
         width=900, 
