@@ -83,6 +83,13 @@ document.querySelectorAll('input[type="range"]').forEach(slider => {
     });
 });
 
+// Focus Release for Button Elements so they don't have keyboard focus after clicking:
+document.querySelectorAll('button').forEach(button => {
+    button.addEventListener('pointerup', () => {
+        button.blur();
+    });
+});
+
 // Dynamic Status Bar Count Handler
 function updateStatusCount() {
     const statusText = document.getElementById('status-text');
@@ -97,11 +104,11 @@ function initWebAudio() {
     audioSource = audioCtx.createMediaElementSource(audioPlayer); 
     compressor = audioCtx.createDynamicsCompressor();
     
-    compressor.threshold.setValueAtTime(-50, audioCtx.currentTime); 
-    compressor.knee.setValueAtTime(40, audioCtx.currentTime);        
-    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);       
-    compressor.attack.setValueAtTime(0, audioCtx.currentTime);       
-    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);   
+    compressor.threshold.setValueAtTime(-50, audioCtx.currentTime);
+    compressor.knee.setValueAtTime(40, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+    compressor.attack.setValueAtTime(0, audioCtx.currentTime);   
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
 
     audioSource.connect(audioCtx.destination);
 }
