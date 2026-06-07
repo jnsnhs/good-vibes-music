@@ -539,7 +539,10 @@ function playTrack(track, coverSrc) {
     audioPlayer.src = safePath;
     audioPlayer.play();
     isPlaying = true;
-    document.getElementById('play-pause-btn').innerText = '⏸';
+    document.getElementById('play-pause-btn').innerHTML =
+    '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+    '<path d="M640-200q-33 0-56.5-23.5T560-280v-400q0-33 23.5-56.5T640-760q33 0 56.5 23.5T720-680v400q0 33-23.5 56.5T640-200Zm-320 0q-33 0-56.5-23.5T240-280v-400q0-33 23.5-56.5T320-760q33 0 56.5 23.5T400-680v400q0 33-23.5 56.5T320-200Z"/>' +
+    '</svg>';
     document.getElementById('np-title').innerText = track.title;
     document.getElementById('np-artist').innerText = track.artist;
     document.getElementById('np-cover').src = coverSrc;
@@ -549,10 +552,16 @@ document.getElementById('play-pause-btn').addEventListener('click', () => {
     if (!audioPlayer.src) return;
     if (isPlaying) {
         audioPlayer.pause();
-        document.getElementById('play-pause-btn').innerText = '▶';
+        document.getElementById('play-pause-btn').innerHTML =
+            '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"/>' +
+            '</svg>';
     } else {
         audioPlayer.play();
-        document.getElementById('play-pause-btn').innerText = '⏸';
+        document.getElementById('play-pause-btn').innerHTML =
+            '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M640-200q-33 0-56.5-23.5T560-280v-400q0-33 23.5-56.5T640-760q33 0 56.5 23.5T720-680v400q0 33-23.5 56.5T640-200Zm-320 0q-33 0-56.5-23.5T240-280v-400q0-33 23.5-56.5T320-760q33 0 56.5 23.5T400-680v400q0 33-23.5 56.5T320-200Z"/>' +
+            '</svg>';
     }
     isPlaying = !isPlaying;
 });
@@ -560,6 +569,19 @@ document.getElementById('play-pause-btn').addEventListener('click', () => {
 document.getElementById('shuffle-btn').addEventListener('click', (e) => {
     isShuffle = !isShuffle;
     e.target.classList.toggle('active', isShuffle);
+    if (isShuffle) {
+        document.getElementById('shuffle-btn').innerHTML =
+         '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm480-120h160q17 0 28.5-11.5T800-200v-160q0-17-11.5-28.5T760-400q-17 0-28.5 11.5T720-360v62l-97-97q-12-12-28.5-12T566-395q-12 12-12.5 28t11.5 28l99 99h-64q-17 0-28.5 11.5T560-200q0 17 11.5 28.5T600-160Zm-428-12q11 11 28 11t28-11l492-492v64q0 17 11.5 28.5T760-560q17 0 28.5-11.5T800-600v-160q0-17-11.5-28.5T760-800H600q-17 0-28.5 11.5T560-760q0 17 11.5 28.5T600-720h64L172-228q-11 11-11 28t11 28Zm-1-560 168 167q11 11 28 11t28-11q12-12 11.5-28.5T395-621L227-788q-12-11-28.5-11T171-788q-11 11-11 28t11 28Z"/>' +
+            '</svg>'
+        ;
+    } else {
+        document.getElementById('shuffle-btn').innerHTML = 
+         '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M600-160q-17 0-28.5-11.5T560-200q0-17 11.5-28.5T600-240h64l-99-99q-12-12-11.5-28.5T566-396q12-12 28.5-12t28.5 12l97 98v-62q0-17 11.5-28.5T760-400q17 0 28.5 11.5T800-360v160q0 17-11.5 28.5T760-160H600Zm-428-12q-11-11-11-28t11-28l492-492h-64q-17 0-28.5-11.5T560-760q0-17 11.5-28.5T600-800h160q17 0 28.5 11.5T800-760v160q0 17-11.5 28.5T760-560q-17 0-28.5-11.5T720-600v-64L228-172q-11 11-28 11t-28-11Zm-1-560q-11-11-11-28t11-28q11-11 27.5-11t28.5 11l168 167q11 11 11.5 27.5T395-565q-11 11-28 11t-28-11L171-732Z"/>' +
+            '</svg>'
+        ;
+    }
 });
 
 const repeatBtn = document.getElementById('repeat-btn');
@@ -568,19 +590,31 @@ repeatBtn.addEventListener('click', () => {
         // State 1: Repeat All
         repeatMode = 'all';
         repeatBtn.classList.add('active');
-        repeatBtn.innerText = '🔁';
+        repeatBtn.innerHTML = 
+            '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406Z"/>' +
+            '</svg>'
+        ;
         repeatBtn.title = 'Repeat: All';
     } else if (repeatMode === 'all') {
         // State 2: Repeat One (Uses the standard '1' repeat emoji)
         repeatMode = 'one';
         repeatBtn.classList.add('active');
-        repeatBtn.innerText = '🔂'; 
+        repeatBtn.innerHTML = 
+            '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406ZM460-540v150q0 13 8.5 21.5T490-360q13 0 21.5-8.5T520-390v-170q0-17-11.5-28.5T480-600h-50q-13 0-21.5 8.5T400-570q0 13 8.5 21.5T430-540h30Z"/>' +
+            '</svg>'
+        ;
         repeatBtn.title = 'Repeat: One';
     } else {
         // State 3: Off
         repeatMode = 'off';
         repeatBtn.classList.remove('active');
-        repeatBtn.innerText = '🔁';
+        repeatBtn.innerHTML = 
+            '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+          '<path d="m274-200 34 34q12 12 11.5 28T308-110q-12 12-28.5 12.5T251-109L148-212q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l103-103q12-12 28.5-11.5T308-370q11 12 11.5 28T308-314l-34 34h406v-120q0-17 11.5-28.5T720-440q17 0 28.5 11.5T760-400v120q0 33-23.5 56.5T680-200H274Zm412-480H280v120q0 17-11.5 28.5T240-520q-17 0-28.5-11.5T200-560v-120q0-33 23.5-56.5T280-760h406l-34-34q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T709-851l103 103q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L709-589q-12 12-28.5 11.5T652-590q-11-12-11.5-28t11.5-28l34-34Z"/>' +
+        '</svg>'
+        ;
         repeatBtn.title = 'Repeat: Off';
     }
 });
@@ -611,7 +645,11 @@ audioPlayer.addEventListener('ended', async () => {
     } else {
         // 3. End of library reached and Repeat All is OFF. Reset the UI.
         isPlaying = false;
-        document.getElementById('play-pause-btn').innerText = '▶';
+        document.getElementById('play-pause-btn').innerHTML = 
+        '<svg class="btn-icon" viewBox="0 -960 960 960">' +
+            '<path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"/>' +
+            '</svg>'
+        ;
         audioPlayer.currentTime = 0;
     }
 });
@@ -1402,3 +1440,12 @@ document.getElementById('btn-save-grid-settings').addEventListener('click', () =
     gridSettingsModal.classList.add('hidden');
     renderAlbumGrid(); 
 });
+
+/* PROGRESS TRACKING HELPER FOR RANGE ELEMENTS*/
+
+for (let e of document.querySelectorAll('input[type="range"].slider-progress')) {
+  e.style.setProperty('--value', e.value);
+  e.style.setProperty('--min', e.min == '' ? '0' : e.min);
+  e.style.setProperty('--max', e.max == '' ? '100' : e.max);
+  e.addEventListener('input', () => e.style.setProperty('--value', e.value));
+}

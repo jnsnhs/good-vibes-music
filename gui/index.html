@@ -64,12 +64,26 @@
     <footer class="control-bar">
       <div class="playback-container">
         <button id="prev-btn" class="icon-btn" title="Previous Track">
-          ⏮
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="M220-280v-400q0-17 11.5-28.5T260-720q17 0 28.5 11.5T300-680v400q0 17-11.5 28.5T260-240q-17 0-28.5-11.5T220-280Zm458-1L430-447q-9-6-13.5-14.5T412-480q0-10 4.5-18.5T430-513l248-166q5-4 11-5t11-1q16 0 28 11t12 29v330q0 18-12 29t-28 11q-5 0-11-1t-11-5Z"
+            />
+          </svg>
         </button>
         <button id="play-pause-btn" class="icon-btn" title="Play/Pause">
-          ▶
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"
+            />
+          </svg>
         </button>
-        <button id="next-btn" class="icon-btn" title="Next Track">⏭</button>
+        <button id="next-btn" class="icon-btn" title="Next Track">
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="M660-280v-400q0-17 11.5-28.5T700-720q17 0 28.5 11.5T740-680v400q0 17-11.5 28.5T700-240q-17 0-28.5-11.5T660-280Zm-440-35v-330q0-18 12-29t28-11q5 0 11 1t11 5l248 166q9 6 13.5 14.5T548-480q0 10-4.5 18.5T530-447L282-281q-5 4-11 5t-11 1q-16 0-28-11t-12-29Z"
+            />
+          </svg>
+        </button>
       </div>
 
       <div class="now-playing-container">
@@ -85,6 +99,7 @@
         <input
           type="range"
           id="progress-bar"
+          class="slider-progress"
           value="0"
           min="0"
           max="100"
@@ -94,9 +109,27 @@
       </div>
 
       <div class="playback-modes-container">
-        <button id="shuffle-btn" class="icon-btn" title="Shuffle">🔀</button>
-        <button id="repeat-btn" class="icon-btn" title="Repeat">🔁</button>
-        <button id="queue-btn" class="icon-btn" title="Queue">📃</button>
+        <button id="shuffle-btn" class="icon-btn" title="Shuffle">
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="M600-160q-17 0-28.5-11.5T560-200q0-17 11.5-28.5T600-240h64l-99-99q-12-12-11.5-28.5T566-396q12-12 28.5-12t28.5 12l97 98v-62q0-17 11.5-28.5T760-400q17 0 28.5 11.5T800-360v160q0 17-11.5 28.5T760-160H600Zm-428-12q-11-11-11-28t11-28l492-492h-64q-17 0-28.5-11.5T560-760q0-17 11.5-28.5T600-800h160q17 0 28.5 11.5T800-760v160q0 17-11.5 28.5T760-560q-17 0-28.5-11.5T720-600v-64L228-172q-11 11-28 11t-28-11Zm-1-560q-11-11-11-28t11-28q11-11 27.5-11t28.5 11l168 167q11 11 11.5 27.5T395-565q-11 11-28 11t-28-11L171-732Z"
+            />
+          </svg>
+        </button>
+        <button id="repeat-btn" class="icon-btn" title="Repeat">
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="m274-200 34 34q12 12 11.5 28T308-110q-12 12-28.5 12.5T251-109L148-212q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l103-103q12-12 28.5-11.5T308-370q11 12 11.5 28T308-314l-34 34h406v-120q0-17 11.5-28.5T720-440q17 0 28.5 11.5T760-400v120q0 33-23.5 56.5T680-200H274Zm412-480H280v120q0 17-11.5 28.5T240-520q-17 0-28.5-11.5T200-560v-120q0-33 23.5-56.5T280-760h406l-34-34q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T709-851l103 103q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L709-589q-12 12-28.5 11.5T652-590q-11-12-11.5-28t11.5-28l34-34Z"
+            />
+          </svg>
+        </button>
+        <button id="queue-btn" class="icon-btn" title="Queue">
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path
+              d="M640-160q-50 0-85-35t-35-85q0-50 35-85t85-35q11 0 21 1.5t19 6.5v-288q0-17 11.5-28.5T720-720h120q17 0 28.5 11.5T880-680q0 17-11.5 28.5T840-640h-80v360q0 50-35 85t-85 35ZM160-320q-17 0-28.5-11.5T120-360q0-17 11.5-28.5T160-400h240q17 0 28.5 11.5T440-360q0 17-11.5 28.5T400-320H160Zm0-160q-17 0-28.5-11.5T120-520q0-17 11.5-28.5T160-560h400q17 0 28.5 11.5T600-520q0 17-11.5 28.5T560-480H160Zm0-160q-17 0-28.5-11.5T120-680q0-17 11.5-28.5T160-720h400q17 0 28.5 11.5T600-680q0 17-11.5 28.5T560-640H160Z"
+            />
+          </svg>
+        </button>
       </div>
 
       <div class="volume-container">
