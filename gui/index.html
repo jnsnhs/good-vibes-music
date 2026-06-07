@@ -152,6 +152,7 @@
     </footer>
 
     <div id="context-menu" class="hidden">
+      <div class="context-item" id="ctx-play-next">Play Next</div>
       <div class="context-item" id="ctx-edit">Edit Metadata</div>
       <div class="context-item delete-text" id="ctx-remove">
         Remove from Library
@@ -208,6 +209,15 @@
           <button id="btn-save-edit" class="primary-btn">Save Changes</button>
         </div>
       </div>
+    </div>
+
+    <div id="queue-popover" class="hidden">
+      <div class="queue-header">
+        <h3>Up Next</h3>
+        <button id="clear-queue-btn" class="text-btn">Clear</button>
+      </div>
+      <ul id="queue-list"></ul>
+      <div id="queue-footer" class="hidden">... and 0 more tracks</div>
     </div>
 
     <div id="import-progress-container" class="hidden">
