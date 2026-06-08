@@ -1,6 +1,6 @@
 ## Projekttitel
 
-Der Arbeitstitel dieses Projekts lautet *Good Vibes Music* ([Repository](https://github.com/jnsnhs/good-vibes-music)). 
+Arbeitstitel dieses Projekts lautet *Good Vibes Music* ([Repository](https://github.com/jnsnhs/good-vibes-music)). 
 
 
 ## Ausgangssituation
@@ -43,7 +43,7 @@ Basierend auf dem beschriebenen Ist-Zustand hat dieses Projekt die Entwicklung e
 - Filterfunktion, mit der innerhalb der beiden Darstellungsmöglichkeiten die Datenbank gezielt nach Metadatan gefiltert werden kann.
 
 
-#### Should Have
+### Should Have
 
 - Nutzerfreundliche und polierte GUI, deren Akzent-Farbe sich vom Nutzer auswählen lässt.
 
@@ -54,7 +54,7 @@ Basierend auf dem beschriebenen Ist-Zustand hat dieses Projekt die Entwicklung e
 - Wartbarer und sauberer Quelltext, der mindestens im Python-Backend objektorientiert ist.
 
 
-#### Could Have
+### Could Have
 
 - Farbliche Hinterlegung der Track-Listen in der Albendarstellung, orientiert an der Farbpalette der jeweilgen Cover Art.
 
@@ -83,7 +83,7 @@ Welche Technologien werden eingesetzt?
 
 Bewusst verzichtet werden soll (zunächst) auf die Umsetzung folgender Funktionen:
 
-#### Won't Have
+### Won't Have
 
 - Möglichkeit zur Erstellung eigener Playlisten: Damit NutzerInnen nicht in einen Verwaltungsmodus verfallen und mehr Zeit mit dem Anlegen der perfekten Playlist als mit dem bewussten Hören von Musik verbringen, wird auf dieses Feature gezielt verzichtet.
 
