@@ -241,6 +241,22 @@
       <div id="queue-footer" class="hidden">... and 0 more tracks</div>
     </div>
 
+    <div id="application-menu" class="hidden">
+      <ul id="app-menu-list">
+        <li id="app-settings-menu-item">
+          <span class="app-menu-item">Settings</span>
+          <span class="app-menu-shortcut"><kbd>CTRL</kbd>+<kbd>,</kbd></span>
+        </li>
+        <li>
+          <span class="app-menu-item">About</span>
+        </li>
+        <li>
+          <span class="app-menu-item">Exit</span>
+          <span class="app-menu-shortcut"><kbd>CTRL</kbd>+<kbd>Q</kbd></span>
+        </li>
+      </ul>
+    </div>
+
     <div id="import-progress-container" class="hidden">
       <div class="progress-header">
         <span>Importing Music...</span>
@@ -347,6 +363,58 @@
             Cancel
           </button>
           <button id="btn-save-grid-settings" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-settings-modal" class="hidden">
+      <div class="modal-content" style="width: 350px">
+        <h2>Application Settings</h2>
+
+        <div style="margin-bottom: 20px">
+          <label
+            style="
+              font-size: 11px;
+              color: var(--text-secondary);
+              text-transform: uppercase;
+            "
+            >Audio Options</label
+          >
+          <div style="margin-top: 8px">
+            <label
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              "
+            >
+              <input type="checkbox" id="settings-audio-normalization" />
+              Normalization
+            </label>
+          </div>
+        </div>
+
+        <!-- <div style="margin-bottom: 20px">
+          <label
+            style="
+              font-size: 11px;
+              color: var(--text-secondary);
+              text-transform: uppercase;
+            "
+            >Visual Options</label
+          >
+          <div style="margin-top: 8px">
+
+          </div>
+        </div> -->
+
+        <div class="modal-actions">
+          <button id="btn-cancel-app-settings" class="secondary-btn">
+            Cancel
+          </button>
+          <button id="btn-save-app-settings" class="primary-btn">Save</button>
         </div>
       </div>
     </div>

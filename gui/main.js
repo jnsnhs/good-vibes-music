@@ -16,7 +16,7 @@ let currentPlayingPath = null;
 let audioCtx;
 let audioSource;
 let compressor;
-let isNormalized = false;
+let isNormalized = true;
 
 let currentView = 'list'; // NEW: Tracks 'list' or 'grid'
 let gridAlbums = [];      // NEW: Holds parsed album data
@@ -28,7 +28,6 @@ const doubleClickDelay = 200;
 let doubleClickOnTrackPossible = false;
 
 const playPauseBtn = document.getElementById('play-pause-btn');
-const normalizeBtn = document.getElementById('normalize-btn');
 const volumeBtn = document.getElementById('volume-btn');
 const volumeBar = document.getElementById('volume-bar');
 const addMusicBtn = document.getElementById('add-music-btn');
@@ -38,10 +37,63 @@ const listContainer = document.getElementById('track-list-container');
 const trackList = document.getElementById('track-list');
 const LIST_VIEW_ROW_HEIGHT = 52; 
 const LIST_VIEW_ROW_BUFFER = 10; 
-const coverCache = {}; 
+const coverCache = {};
+
+
+// APPLICATION MENU
+
+const applicationMenuBtn = document.getElementById('application-menu-btn');
+
+const applicationMenu = document.getElementById('application-menu');
+const settingsMenuItem = document.getElementById('app-settings-menu-item');
+const appSettingsModal = document.getElementById('app-settings-modal');
+
+function activateApplicationMenuBtn() {
+    applicationMenuBtn.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        applicationMenu.classList.toggle('hidden');
+    });
+}
+
+function activateSettingsMenuItem() {
+    settingsMenuItem.addEventListener('mouseup', () => {
+        applicationMenu.classList.toggle('hidden');
+        document.getElementById('settings-audio-normalization').checked = isNormalized;
+        appSettingsModal.classList.toggle('hidden');
+    });
+}
+
+function applyAudioOptions() {
+    initWebAudio();
+    if (isNormalized) {
+        audioSource.disconnect(audioCtx.destination);
+        audioSource.connect(compressor);
+        compressor.connect(audioCtx.destination);
+    } else {
+        audioSource.disconnect(compressor);
+        compressor.disconnect(audioCtx.destination);
+        audioSource.connect(audioCtx.destination);
+    }
+}
+
+document.getElementById('btn-cancel-app-settings').addEventListener('click', () => {
+    appSettingsModal.classList.add('hidden');
+});
+
+document.getElementById('btn-save-app-settings').addEventListener('click', () => {
+    isNormalized = document.getElementById('settings-audio-normalization').checked;
+    appSettingsModal.classList.add('hidden');
+    applyAudioOptions();
+});
+
+activateApplicationMenuBtn();
+activateSettingsMenuItem();
+
+
+
 
 function isModalDialogOpen() {
-    const modalIds = ['grid-settings-modal', 'edit-modal-overlay'];
+    const modalIds = ['grid-settings-modal', 'edit-modal-overlay', 'app-settings-modal'];
     const isModalOpen = modalIds.some(id => {
         const modal = document.getElementById(id);
         return modal && !modal.classList.contains('hidden');
@@ -103,49 +155,15 @@ function initWebAudio() {
     if (audioCtx) return; 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioSource = audioCtx.createMediaElementSource(audioPlayer);
-
-    // Playback without normalization:
-    // audioSource.connect(audioCtx.destination);
-
-    // compressor = audioCtx.createDynamicsCompressor();
-    // compressor.threshold.setValueAtTime(-50, audioCtx.currentTime);
-    // compressor.knee.setValueAtTime(40, audioCtx.currentTime);
-    // compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-    // compressor.attack.setValueAtTime(0, audioCtx.currentTime);   
-    // compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
-
-    const compressor = new DynamicsCompressorNode(audioCtx, {
+    compressor = new DynamicsCompressorNode(audioCtx, {
         threshold: -50,
         knee: 40,
         ratio: 12,
         attack: 0,
         release: 0.25,
     });
-
-    // Playback with normalization:
-    audioSource.connect(compressor);
-    compressor.connect(audioCtx.destination);
+    audioSource.connect(audioCtx.destination);
 }
-
-function activateNormalizeBtn() {
-    if (normalizeBtn) {
-        normalizeBtn.addEventListener('click', () => {
-            initWebAudio();
-            isNormalized = !isNormalized;
-            // audioSource.disconnect(audioCtx.destination);
-            if (isNormalized) {
-                // audioSource.connect(compressor);
-                // compressor.connect(audioCtx.destination);
-            } else {
-                // audioSource.connect(audioCtx.destination);
-            }
-        });
-    }
-}
-
-// https://github.com/mdn/webaudio-examples/blob/main/compressor-example/index.html
-
-
 
 
 
@@ -287,7 +305,6 @@ function activateAddMusicBtn() {
 
 function activateGuiElements() {
     document.addEventListener('DOMContentLoaded', () => {
-        activateNormalizeBtn();
         activateAddMusicBtn();
     });
 }

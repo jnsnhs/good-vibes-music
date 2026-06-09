@@ -5,6 +5,7 @@
 :root {
   --green: #1db954;
   --indigo: #544ddb;
+  --fake-green: #00695C;
 }
 
 @media (prefers-color-scheme: light) {
@@ -19,7 +20,7 @@
     --btn-icon-color: #747474;
     --btn-range-color: #e2e2e2;
     --btn-bg-hover-color: #ebebeb;
-    --accent: var(--indigo);
+    --accent: var(--fake-green);
     --border-color: #d2d2d7;
     --border-light: #e5e5ea;
     --danger: #ff3b30;
@@ -79,7 +80,7 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: 0px -5px 10px 10px rgba(0, 0, 0, 0.10);
+  box-shadow: 0px -5px 10px 10px rgba(0, 0, 0, 0.1);
   z-index: 99;
 }
 
@@ -91,7 +92,8 @@ body {
 
 .view-btn {
   background-color: transparent;
-  color: var(--text-secondary);
+  /* color: var(--text-secondary); */
+  color: var(--accent);
   border: 0px solid var(--btn-bg-hover-color);
   padding: 4px 8px;
   font-size: 13px;
@@ -110,6 +112,7 @@ body {
 
 .view-btn svg {
   fill: var(--btn-icon-color);
+  fill: var(--accent);
   height: 19px;
 }
 .view-btn.active svg {
@@ -118,13 +121,13 @@ body {
 
 .view-btn:hover {
   color: var(--text-secondary);
+  color: var(--accent);
   background-color: var(--btn-bg-hover-color);
 }
 
 .view-btn.active {
   background-color: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  color: #fff;
   font-weight: bold;
 }
 
@@ -177,7 +180,13 @@ body {
 }
 
 #application-menu-btn {
-  margin-left: 12px;
+  margin-left: 6px;
+  padding: 4px;
+  height: 30px;
+}
+
+#application-menu-btn svg {
+  fill: var(--accent);
 }
 
 /* =========================================
@@ -465,7 +474,7 @@ body {
   border-top: 1px solid var(--border-color);
   box-sizing: border-box;
   transition: background-color 0.3s;
-  box-shadow: 0px 5px 10px 10px rgba(0, 0, 0, 0.10);
+  box-shadow: 0px 5px 10px 10px rgba(0, 0, 0, 0.1);
 }
 
 button {
@@ -490,7 +499,8 @@ button.icon-btn:hover {
 }
 
 button.icon-btn svg.btn-icon {
-  fill: var(--btn-icon-color);
+  /* fill: var(--btn-icon-color); */
+  fill: var(--accent);
 }
 
 #play-pause-btn {
@@ -1043,4 +1053,69 @@ input#volume-bar::-webkit-slider-thumb {
   background-color: var(--bg-input);
   border-top: 1px solid var(--border-color);
   font-weight: 500;
+}
+
+/* APP SETTINGS MENU + BUTTON */
+
+#application-menu {
+  position: absolute;
+  top: 60px; 
+  right: 20px;
+  /* width: 120px; */
+  max-height: 450px;
+  background-color: var(--bg-panel);
+  border: 1px solid white;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+#app-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+#app-menu-list li {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 36px;
+  align-items: center;
+  padding: 10px 15px;
+  font-size: 13px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+#app-menu-list li:hover {
+  background-color: var(--btn-bg-hover-color);
+  box-sizing: border-box;
+}
+
+.app-menu-item {
+  grid-column: 1 / 2;
+  justify-self: start;
+}
+
+.app-menu-shortcut {
+  grid-column: 2 /3;
+  justify-self: end;
+  color: var(--text-muted);
+}
+
+#app-settings-modal {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.33);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
