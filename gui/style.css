@@ -614,6 +614,15 @@ input#progress-bar::-webkit-slider-thumb {
   max-width: 250px;
 }
 
+button#volume-btn {
+  transition: all 0.3s;
+}
+
+button#volume-btn svg {
+  position: absolute;
+  height: 24px;
+}
+
 input#volume-bar {
   -webkit-appearance: none;
   appearance: none;
