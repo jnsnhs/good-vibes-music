@@ -7,30 +7,53 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="menu-bar" id="display-options">
-      <div style="display: flex; gap: 15px; align-items: center">
+    <header class="menu-bar">
+
+      <div id="view-btn-container" style="display: flex; gap: 15px; align-items: center">
         <div class="view-toggles" style="display: flex; gap: 5px">
-          <button id="toggle-list-btn" class="view-btn active">Songs</button>
-          <button id="toggle-grid-btn" class="view-btn">Albums</button>
+          <button id="toggle-list-btn" class="view-btn active" title="View songs">
+            <svg viewBox="0 -960 960 960">
+              <path d="M287-167q-47-47-47-113t47-113q47-47 113-47 23 0 42.5 5.5T480-418v-382q0-17 11.5-28.5T520-840h160q17 0 28.5 11.5T720-800v80q0 17-11.5 28.5T680-680H560v400q0 66-47 113t-113 47q-66 0-113-47Z"/>
+            </svg>
+            <div>Songs</div>
+          </button>
+          <button id="toggle-grid-btn" class="view-btn" title="View albums">
+            <svg viewBox="0 -960 960 960">
+              <path d="M480-300q75 0 127.5-52.5T660-480q0-75-52.5-127.5T480-660q-75 0-127.5 52.5T300-480q0 75 52.5 127.5T480-300Zm-28.5-151.5Q440-463 440-480t11.5-28.5Q463-520 480-520t28.5 11.5Q520-497 520-480t-11.5 28.5Q497-440 480-440t-28.5-11.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/>
+            </svg>
+            Albums</button>
         </div>
-        <button
+        <!-- <button
           id="grid-settings-btn"
           class="icon-btn hidden"
           title="Grid Settings"
         >
           ⚙️
-        </button>
+        </button> -->
       </div>
       <div id="status-text" style="display: none">0 tracks in library</div>
       <div id="search-input-container">
         <input
-          type="search"
+          type="text"
           id="search-input"
           placeholder="Search library..."
           spellcheck="false"
         />
       </div>
-      <button id="add-music-btn">Add Music</button>
+      <div id="menu-bar-right-container">
+        <button id="add-music-btn" class="view-btn" title="Add files to the library">
+          <svg viewBox="0 -960 960 960">
+            <path d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/>
+          </svg>
+          Add Music
+        </button>
+        <button id="application-menu-btn" class="icon-btn" title="Open application menu">
+          <svg viewBox="0 -960 960 960">
+            <path d="M160-240q-17 0-28.5-11.5T120-280q0-17 11.5-28.5T160-320h640q17 0 28.5 11.5T840-280q0 17-11.5 28.5T800-240H160Zm0-200q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h640q17 0 28.5 11.5T840-480q0 17-11.5 28.5T800-440H160Zm0-200q-17 0-28.5-11.5T120-680q0-17 11.5-28.5T160-720h640q17 0 28.5 11.5T840-680q0 17-11.5 28.5T800-640H160Z"/>
+          </svg>
+        </button>
+      </div>
+
     </header>
 
     <main class="library-container">
@@ -134,11 +157,13 @@
 
       <div class="volume-container">
         <button
-          id="normalize-btn"
+          id="volume-btn"
           class="icon-btn"
-          title="Toggle Volume Normalization"
+          title="Toggle Volume"
         >
-          🔊
+          <svg class="btn-icon" viewBox="0 -960 960 960">
+            <path d="M760-481q0-83-44-151.5T598-735q-15-7-22-21.5t-2-29.5q6-16 21.5-23t31.5 0q97 43 155 131.5T840-481q0 108-58 196.5T627-153q-16 7-31.5 0T574-176q-5-15 2-29.5t22-21.5q74-34 118-102.5T760-481ZM280-360H160q-17 0-28.5-11.5T120-400v-160q0-17 11.5-28.5T160-600h120l132-132q19-19 43.5-8.5T480-703v446q0 27-24.5 37.5T412-228L280-360Zm380-120q0 42-19 79.5T591-339q-10 6-20.5.5T560-356v-250q0-12 10.5-17.5t20.5.5q31 25 50 63t19 80Z"/>
+          </svg>
         </button>
         <input
           type="range"

@@ -4,18 +4,22 @@
 
 :root {
   --green: #1db954;
+  --indigo: #544ddb;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg-main: #f2f2f4;
-    --bg-panel: #ffffff;
+    --bg-main: #f2f2f5;
+    --bg-panel: #fcfcfc;
     --bg-hover: #e8e8ed;
     --bg-input: #ffffff;
     --text-main: #1d1d1f;
     --text-secondary: #515154;
     --text-muted: #86868b;
-    --accent: var(--green);
+    --btn-icon-color: #747474;
+    --btn-range-color: #e2e2e2;
+    --btn-bg-hover-color: #ebebeb;
+    --accent: var(--indigo);
     --border-color: #d2d2d7;
     --border-light: #e5e5ea;
     --danger: #ff3b30;
@@ -31,7 +35,7 @@
     --text-main: #ebebeb;
     --text-secondary: #adadad;
     --text-muted: #888888;
-    --accent: var(--green);
+    --accent: var(--indigo);
     --border-color: #333333;
     --border-light: #2a2a2a;
     --danger: #ff4d4d;
@@ -64,12 +68,12 @@ body {
 
 .menu-bar {
   display: grid;
-  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
-  gap: 20px;
+  gap: 6px;
   background-color: var(--bg-panel);
   border-top: 1px solid var(--border-color);
-  padding: 10px 20px;
+  padding: 7px 20px;
   box-sizing: border-box;
   transition: background-color 0.3s;
   font-size: 12px;
@@ -79,25 +83,42 @@ body {
   z-index: 99;
 }
 
-#display-options {
+#view-btn-container {
   grid-column: 1 / 2;
+  align-items: center;
+  justify-content: start;
 }
 
 .view-btn {
   background-color: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  padding: 4px 12px;
-  font-size: 11px;
-  font-weight: normal;
-  border-radius: 4px;
+  border: 0px solid var(--btn-bg-hover-color);
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: bold;
+  border-radius: 7px;
+  height: 30px;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+.view-btn svg {
+  fill: var(--btn-icon-color);
+  height: 19px;
+}
+.view-btn.active svg {
+  fill: #fff;
 }
 
 .view-btn:hover {
-  color: var(--text-main);
-  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  background-color: var(--btn-bg-hover-color);
 }
 
 .view-btn.active {
@@ -111,42 +132,52 @@ body {
   grid-column: 2 / 3;
   width: 100%;
   display: flex;
+  justify-self: center;
   justify-content: center;
 }
 
 #search-input {
   width: 100%;
-  max-width: 400px;
+  /* max-width: 400px; */
   min-width: 100px;
-  padding: 6px 14px;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 4px 8px;
   border-radius: 7px;
   border: 1px solid var(--border-color);
   background-color: var(--bg-input);
   color: var(--text-main);
   outline: none;
   font-size: 13px;
+  height: 30px;
   transition:
     border-color 0.2s,
     background-color 0.3s,
     color 0.3s;
 }
 
+#search-input::before {
+  content: "fieowihg";
+}
+
 #search-input:focus {
-  border-color: var(--accent);
+  border: 2px solid var(--accent);
+  /* box-shadow: 0px 0px 2px var(--accent) inset; */
 }
 
 #search-input::placeholder {
   color: var(--text-muted);
 }
 
-
-#add-music-btn {
+#menu-bar-right-container {
   grid-column: 3 / 4;
-  justify-self: end;
-  padding: 4px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  width: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+
+#application-menu-btn {
+  margin-left: 12px;
 }
 
 /* =========================================
@@ -284,6 +315,9 @@ body {
   background-color: var(--bg-hover);
   transform: translateY(-2px);
 }
+.album-card:active {
+  transform: translateY(0px);
+}
 
 .album-card.active-card {
   background-color: var(--bg-hover);
@@ -293,7 +327,7 @@ body {
 .album-card-cover {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 6px;
+  border-radius: 4px;
   object-fit: cover;
   margin-bottom: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -350,7 +384,7 @@ body {
 .expanded-cover-container img {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 4px;
   object-fit: cover;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
@@ -423,7 +457,7 @@ body {
 
 .control-bar {
   background-color: var(--bg-panel);
-  padding: 10px 20px;
+  padding: 7px 20px;
   display: grid;
   grid-template-columns: 1fr 1fr 2fr 1fr 1fr;
   align-items: center;
@@ -445,16 +479,18 @@ button.icon-btn {
   align-items: center;
   justify-content: center;
   background: none;
-  color: var(--text-secondary);
   font-size: 22px;
   width: 1.5em;
   height: 1.5em;
-  padding: 4px;
-  opacity: 0.4;
+  padding: 3px;
+  opacity: 1;
 }
 button.icon-btn:hover {
-  color: var(--text-main);
-  background: #dfdfdf;
+  background: var(--btn-bg-hover-color);
+}
+
+button.icon-btn svg.btn-icon {
+  fill: var(--btn-icon-color);
 }
 
 #play-pause-btn {
@@ -463,7 +499,7 @@ button.icon-btn:hover {
 
 #shuffle-btn,
 #repeat-btn {
-  padding: 6px;
+  padding: 5px;
 }
 
 .playback-container {
@@ -544,21 +580,19 @@ input#progress-bar {
 /* --- Webkit Browsers --- */
 input#progress-bar::-webkit-slider-runnable-track {
   height: 12px;
-  background: linear-gradient(to right, #6366f1 var(--range-pct, 0%), #e2e8f0 var(--range-pct, 0%));
+  background-color: var(--btn-range-color);
   border-radius: 40px;
-  border: 0px solid #cbd5e1;
-  box-shadow: 0px 2px 0px rgba(0, 0, 0, 0);
+  border: none;
 }
 
 input#progress-bar::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   height: 12px;
   width: 12px;
-  background: #4f46e5;
-  border-radius: 30px;
-  border: 0px solid #ffffff;
-  box-shadow: 0px 4px 0px rgba(0, 0, 0, 0);
-  margin-top: 0px;
+  background-color: var(--accent);
+  border-radius: 40px;
+  border: none;
 }
 
 .playback-modes-container {
@@ -567,7 +601,6 @@ input#progress-bar::-webkit-slider-thumb {
   align-self: center;
   justify-content: start;
   display: flex;
-  color: var(--text-secondary);
 }
 
 .volume-container {
@@ -581,10 +614,33 @@ input#progress-bar::-webkit-slider-thumb {
   max-width: 250px;
 }
 
-#volume-bar {
-  min-width: 60px;
+input#volume-bar {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
+  background: transparent;
+  cursor: pointer;
+  min-width: 60px;
 }
+
+/* --- Webkit Browsers --- */
+input#volume-bar::-webkit-slider-runnable-track {
+  height: 12px;
+  background-color: var(--btn-range-color);
+  border-radius: 40px;
+  border: none;
+}
+
+input#volume-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  width: 12px;
+  background: var(--btn-icon-color);
+  border-radius: 40px;
+  border: none;
+}
+
 
 /* =========================================
    6. CONTEXT MENU & MODALS
