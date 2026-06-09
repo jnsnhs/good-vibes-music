@@ -9,6 +9,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from tinytag import TinyTag
 import time
 
+LIBRARY_FILE = "library.db"
+
 
 # --- NEW: Micro Local Audio Streaming Server ---
 # --- UPDATED: Advanced Micro Streaming Server (Supports Seeking/HTTP 206) ---
@@ -115,7 +117,7 @@ def start_audio_server():
 
 
 def init_db():
-    conn = sqlite3.connect('library.db')
+    conn = sqlite3.connect(LIBRARY_FILE)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS tracks (
@@ -168,8 +170,16 @@ def extract_metadata(file_path):
 
 class Api:
 
-    def get_library(self):
-        conn = sqlite3.connect('library.db')
+    def __init__(self):
+        self.import_state = {
+            "is_running": False,
+            "current": 0,
+            "total": 0,
+            "new_tracks": []
+        }
+
+    def get_library(self) -> list[dict]:
+        conn = sqlite3.connect(LIBRARY_FILE)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("""SELECT
@@ -191,14 +201,12 @@ class Api:
         tracks = []
         for row in rows:
             track = dict(row)
-            # Fast OS check: True if file exists, False if missing
             track['missing'] = not os.path.exists(track['file_path'])
             tracks.append(track)
         return tracks
 
-    def locate_missing_file(self, old_path):
+    def locate_missing_file(self, old_path) -> dict:
         window = webview.windows[0]
-        # Open a file dialog asking them to find the specific track
         result = window.create_file_dialog(
             webview.FileDialog.OPEN,
             allow_multiple=False,
@@ -206,8 +214,7 @@ class Api:
         )
         if result and len(result) > 0:
             new_path = result[0]
-            # Update the database with the new file path
-            conn = sqlite3.connect('library.db')
+            conn = sqlite3.connect(LIBRARY_FILE)
             c = conn.cursor()
             c.execute(
                 "UPDATE tracks SET file_path = ? WHERE file_path = ?",
@@ -217,9 +224,8 @@ class Api:
             return {"status": "success", "new_path": new_path}
         return {"status": "cancelled"}
 
-    # NEW: Fetch image data lazily on demand
-    def get_cover(self, file_path):
-        conn = sqlite3.connect('library.db')
+    def get_cover_on_demand(self, file_path):
+        conn = sqlite3.connect(LIBRARY_FILE)
         c = conn.cursor()
         c.execute(
             "SELECT cover_base64 FROM tracks WHERE file_path = ?",
@@ -229,15 +235,6 @@ class Api:
         if row and row[0]:
             return row[0]
         return None
-
-    def __init__(self):
-        # NEW: State dictionary to track progress
-        self.import_state = {
-            "is_running": False,
-            "current": 0,
-            "total": 0,
-            "new_tracks": []
-        }
 
     # 1. The Trigger Method
     def add_music(self):
@@ -270,7 +267,7 @@ class Api:
     # 2. The Background Worker Thread
     def _process_files_thread(self, files):
         # MUST open a new connection strictly for this thread
-        conn = sqlite3.connect('library.db')
+        conn = sqlite3.connect(LIBRARY_FILE)
         c = conn.cursor()
         for file_path in files:
             try:
