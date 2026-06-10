@@ -120,7 +120,7 @@ body {
   height: 19px;
 }
 .view-btn.active svg {
-  fill: #fff;
+  fill: var(--accent);
 }
 
 .view-btn:hover {
@@ -130,8 +130,8 @@ body {
 }
 
 .view-btn.active {
-  background-color: var(--accent);
-  color: #fff;
+  background-color: var(--btn-bg-hover-color);
+  color: var(--accent);
   font-weight: bold;
 }
 
@@ -1087,6 +1087,7 @@ input#volume-bar::-webkit-slider-thumb {
 
 #app-menu-list li {
   display: grid;
+  color: var(--text-main);
   grid-template-columns: auto auto;
   gap: 36px;
   align-items: center;
