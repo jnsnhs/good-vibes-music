@@ -1013,6 +1013,8 @@ async function requestPlayback(targetIndex, direction = 1, isManualClick = false
     playTrack(track, coverSrc);
 }
 
+
+
 const editModal = document.getElementById('edit-modal-overlay');
 const fieldsToEdit = ['title', 'artist', 'album', 'album_artist', 'genre', 'year', 'track_num', 'disc_num', 'comments'];
 
@@ -1044,15 +1046,23 @@ document.getElementById('ctx-edit').addEventListener('click', () => {
     compBox.indeterminate = !allSameComp; 
     compBox.checked = allSameComp ? (firstComp === 1) : false;
     compBox.dataset.originalState = allSameComp ? (firstComp === 1).toString() : "mixed";
+    console.log("'selectedPaths' when clicking ctx-menu: ");
+    console.log(selectedPaths);
+    console.log('---');
 });
 
-document.getElementById('btn-cancel-edit').addEventListener('click', () => { editModal.classList.add('hidden'); });
+document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+    editModal.classList.add('hidden');
+});
 
-document.getElementById('btn-save-edit').addEventListener('click', async () => {
+const saveMetadataBtn = document.getElementById('btn-save-edit');
+
+saveMetadataBtn.addEventListener('click', async () => {
+    console.log("'selectedPaths' when clicking save: ");
+    console.log(selectedPaths);
+    console.log('---');
     const pathsArray = Array.from(selectedPaths);
-    const saveBtn = document.getElementById('btn-save-edit');
     const modifiedData = {};
-
     fieldsToEdit.forEach(field => {
         const input = document.getElementById(`edit-${field}`);
         if (input.value !== input.dataset.original) {
@@ -1061,7 +1071,6 @@ document.getElementById('btn-save-edit').addEventListener('click', async () => {
             }
         }
     });
-
     const compBox = document.getElementById('edit-compilation');
     if (compBox.dataset.originalState === "mixed" && !compBox.indeterminate) {
         modifiedData['compilation'] = compBox.checked ? 1 : 0;
@@ -1073,12 +1082,12 @@ document.getElementById('btn-save-edit').addEventListener('click', async () => {
         editModal.classList.add('hidden');
         return;
     }
-
-    saveBtn.innerText = "Saving...";
-    saveBtn.disabled = true;
-
-    const result = await window.pywebview.api.update_metadata(pathsArray, modifiedData);
-
+    saveMetadataBtn.innerText = "Saving...";
+    saveMetadataBtn.disabled = true;
+    console.log(pathsArray)
+    console.log(modifiedData)
+    const result = await window.pywebview.api.update_metadata(
+        pathsArray, modifiedData);
     if (result.status === 'success') {
         pathsArray.forEach(path => {
             const masterTrack = masterLibraryData.find(t => t.file_path === path);
@@ -1091,12 +1100,11 @@ document.getElementById('btn-save-edit').addEventListener('click', async () => {
     } else {
         alert("An error occurred while saving metadata. Check the console.");
     }
-
-    saveBtn.innerText = "Save Changes";
-    saveBtn.disabled = false;
+    saveMetadataBtn.innerText = "Save Changes";
+    saveMetadataBtn.disabled = false;
 });
 
-// --- NEW: VIEW TOGGLING ---
+// --- VIEW TOGGLING ---
 const listViewWrapper = document.getElementById('list-view-wrapper');
 const gridViewWrapper = document.getElementById('grid-view-wrapper');
 const toggleListBtn = document.getElementById('toggle-list-btn');
@@ -1559,37 +1567,37 @@ function formatTotalSeconds(totalSecs) {
     return `${m+1} min`;
 }
 
-// --- NEW: Global Deselection Logic ---
-document.addEventListener('click', (e) => {
-    // 1. Identify what the user just clicked on
-    const isTrack = e.target.closest('li:not(.disc-header)'); // Actual songs
-    const isCard = e.target.closest('.album-card'); // Grid covers
-    const isInteractive = e.target.closest('button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover');    
-    
 
-    // 2. If they clicked "empty space" (the background, a disc header, or empty grid padding)
-    if (!isTrack && !isCard && !isInteractive) {
-        
-        // Only trigger DOM updates if there is actually a selection to clear
-        if (selectedPaths.size > 0) {
-            selectedPaths.clear();
-            lastClickedIndex = null;
-            lastGridClickedIndex = null; // NEW: Clear grid anchor
-            
-            // Clear the visual highlight based on the active view
-            if (currentView === 'list') {
-                renderVirtualList();
-            } else {
-                const expandedList = document.getElementById('expanded-track-list');
-                if (expandedList) {
-                    Array.from(expandedList.children).forEach(child => {
-                        child.classList.remove('track-selected');
-                    });
-                }
+function clearSelection() { // visual and logical
+    if (selectedPaths.size > 0) {
+        selectedPaths.clear();
+        lastClickedIndex = null;
+        lastGridClickedIndex = null;
+        if (currentView === 'list') {
+            renderVirtualList();
+        } else { // currentView == 'grid'
+            const expandedList = document.getElementById('expanded-track-list');
+            if (expandedList) {
+                Array.from(expandedList.children).forEach(child => {
+                    child.classList.remove('track-selected');
+                });
             }
         }
     }
+
+}
+
+// --- NEW: Global Deselection Logic ---
+document.addEventListener('click', (e) => {
+    const isTrack = e.target.closest('li:not(.disc-header)'); // Actual songs
+    const isCard = e.target.closest('.album-card'); // Grid covers
+    const isInteractive = e.target.closest(
+        'button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover, #edit-modal-overlay, #grid-settings-modal, #application-menu');    
+        if (!isTrack && !isCard && !isInteractive) {
+        clearSelection();
+    }
 });
+
 
 // --- NEW: Grid Settings State & Logic ---
 let gridSortOrder = 'artist'; // 'artist' or 'year'
