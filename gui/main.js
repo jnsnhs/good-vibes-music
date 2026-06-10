@@ -39,6 +39,8 @@ const LIST_VIEW_ROW_HEIGHT = 52;
 const LIST_VIEW_ROW_BUFFER = 10; 
 const coverCache = {};
 
+const TWO_COLUMN_THRESHOLD = 1024;  // width of window in pixels
+
 
 // APPLICATION MENU
 
@@ -1363,7 +1365,8 @@ function openExpandedAlbum(albumData, cardElement) {
     const currentColumns = Math.round(gridWidth / cardWidth);
 
     // Apply two-column class if conditions are met
-    const useTwoColumns = currentColumns > 4 && albumData.tracks.length > 4;
+
+    const useTwoColumns = window.innerWidth > TWO_COLUMN_THRESHOLD && albumData.tracks.length > 5;
     let trackListHTML = `<ul class="expanded-track-list ${useTwoColumns ? 'two-column' : ''}" id="expanded-track-list">`;    let currentDisc = null;
 
     albumData.tracks.forEach((t, idx) => {
