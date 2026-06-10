@@ -5,21 +5,43 @@ import base64
 import os
 import urllib.parse
 import threading
+import hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from tinytag import TinyTag
 import time
 
 LIBRARY_FILE = "library.db"
+IMG_BROWSER_CACHE_DAYS = 30
 
-
-# --- NEW: Micro Local Audio Streaming Server ---
-# --- UPDATED: Advanced Micro Streaming Server (Supports Seeking/HTTP 206) ---
 
 class AudioStreamHandler(BaseHTTPRequestHandler):
+    """
+    Local Audio Streaming HTTP Server (Supports Seeking/HTTP 206)
+    """
 
     def do_GET(self):
         parsed_path = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed_path.query)
+
+        if 'art' in query:
+            hash_val = query['art'][0]
+            art_path = os.path.join('art_cache', f"{hash_val}.jpg")
+            if os.path.exists(art_path):
+                self.send_response(200)
+                self.send_header('Content-type', 'image/jpeg')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header(
+                    'Cache-Control',
+                    f'public, max-age={IMG_BROWSER_CACHE_DAYS * 86400}'
+                )
+                self.end_headers()
+                with open(art_path, 'rb') as f:
+                    self.wfile.write(f.read())
+                return
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
 
         if 'file' in query:
             file_path = query['file'][0]
@@ -105,9 +127,6 @@ class AudioStreamHandler(BaseHTTPRequestHandler):
         self.send_response(404)
         self.end_headers()
 
-    def log_message(self, format, *args):
-        pass  # Keep terminal logs clean
-
 
 def start_audio_server():
     """Runs the server on a dedicated background thread."""
@@ -117,6 +136,7 @@ def start_audio_server():
 
 
 def init_db():
+    os.makedirs('art_cache', exist_ok=True)
     conn = sqlite3.connect(LIBRARY_FILE)
     c = conn.cursor()
     c.execute('''
@@ -134,7 +154,7 @@ def init_db():
             disc_num TEXT,
             compilation INTEGER,
             comments TEXT,
-            cover_base64 TEXT
+            cover_hash TEXT
         )
     ''')
     conn.commit()
@@ -182,20 +202,23 @@ class Api:
         conn = sqlite3.connect(LIBRARY_FILE)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("""SELECT
-                  file_path,
-                  title,
-                  artist,
-                  album,
-                  year,
-                  duration,
-                  album_artist,
-                  genre,
-                  track_num,
-                  disc_num,
-                  compilation,
-                  comments
-            FROM tracks""")
+        c.execute("""
+            SELECT
+                file_path,
+                title,
+                artist,
+                album,
+                year,
+                duration,
+                album_artist,
+                genre,
+                track_num,
+                disc_num,
+                compilation,
+                comments,
+                cover_hash
+            FROM tracks
+        """)
         rows = c.fetchall()
         conn.close()
         tracks = []
@@ -224,17 +247,17 @@ class Api:
             return {"status": "success", "new_path": new_path}
         return {"status": "cancelled"}
 
-    def get_cover_on_demand(self, file_path):
-        conn = sqlite3.connect(LIBRARY_FILE)
-        c = conn.cursor()
-        c.execute(
-            "SELECT cover_base64 FROM tracks WHERE file_path = ?",
-            (file_path,))
-        row = c.fetchone()
-        conn.close()
-        if row and row[0]:
-            return row[0]
-        return None
+    # def get_cover_on_demand(self, file_path):
+    #     conn = sqlite3.connect(LIBRARY_FILE)
+    #     c = conn.cursor()
+    #     c.execute(
+    #         "SELECT cover_base64 FROM tracks WHERE file_path = ?",
+    #         (file_path,))
+    #     row = c.fetchone()
+    #     conn.close()
+    #     if row and row[0]:
+    #         return row[0]
+    #     return None
 
     # 1. The Trigger Method
     def add_music(self):
@@ -290,22 +313,23 @@ class Api:
                     ] else 0
                 duration = time.strftime(
                     '%M:%S', time.gmtime(tag.duration or 0))
-                # FIX 1: Process and encode the cover art
-                cover_base64 = None
+                # Image Extraction & Deduplication
+                cover_hash = None
                 image_data = tag.get_image()
                 if image_data:
-                    cover_base64 = "data:image/jpeg;base64," + \
-                        base64.b64encode(image_data).decode('utf-8')
-                # FIX 1: Add cover_base64 back to the INSERT statement
-                # --- UPDATED INSERT STATEMENT ---
+                    cover_hash = hashlib.md5(image_data).hexdigest()
+                    art_path = os.path.join('art_cache', f"{cover_hash}.jpg")
+                    if not os.path.exists(art_path):
+                        with open(art_path, 'wb') as f:
+                            f.write(image_data)
                 c.execute('''INSERT OR IGNORE INTO tracks
                             (file_path,title, artist, album, year, duration,
                             album_artist, genre, track_num, disc_num,
-                            compilation, comments, cover_base64)
+                            compilation, comments, cover_hash)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                           (file_path, title, artist, album, year, duration,
                            album_artist, genre, track_num, disc_num,
-                           is_compilation, comments, cover_base64))
+                           is_compilation, comments, cover_hash))
                 # FIX 2: c.rowcount will be 1 if a new row was added, and 0 if
                 #  IGNORE triggered.
                 # We only send data back to the JavaScript GUI if it is
@@ -323,7 +347,8 @@ class Api:
                         "track_num": track_num,
                         "disc_num": disc_num,
                         "is_compilation": is_compilation,
-                        "comments": comments
+                        "comments": comments,
+                        "cover_hash": cover_hash
                     })
             except Exception as e:
                 print(f"Error parsing {file_path}: {e}")
@@ -355,22 +380,31 @@ class Api:
         return {"status": "success"}
 
     def update_metadata(self, file_paths, modified_data):
-        # Map our database column names to music_tag's specific keys
         tag_map = {
-            'title': 'title', 'artist': 'artist', 'album': 'album',
-            'year': 'year', 'album_artist': 'albumartist', 'genre': 'genre',
-            'track_num': 'tracknumber', 'disc_num': 'discnumber',
-            'compilation': 'compilation', 'comments': 'comment'
+            'title': 'title',
+            'artist': 'artist',
+            'album': 'album',
+            'year': 'year',
+            'album_artist': 'albumartist',
+            'genre': 'genre',
+            'track_num': 'tracknumber',
+            'disc_num': 'discnumber',
+            'compilation': 'compilation',
+            'comments': 'comment'
         }
         conn = sqlite3.connect('library.db')
         c = conn.cursor()
         try:
+            print(file_paths)
+            print(modified_data)
             for path in file_paths:
                 # 1. Update the Physical Audio File
                 f = music_tag.load_file(path)
-                print(f)
+                print(modified_data.items())
                 for key, val in modified_data.items():
                     if key in tag_map:
+                        print(key)
+                        print(tag_map[key])
                         f[tag_map[key]] = val  # type: ignore
                 f.save()  # type: ignore
 
@@ -386,24 +420,24 @@ class Api:
                 )
             conn.commit()
             status = "success"
+            print(status)
         except Exception as e:
             print(f"Failed to edit metadata: {e}")
             status = "error"
         conn.close()
         return {"status": status}
 
-    def check_file_exists(self, file_path):
+    def check_file_exists(self, file_path) -> bool:
         return os.path.exists(file_path)
 
 
 if __name__ == '__main__':
     init_db()
     start_audio_server()
-    api = Api()
     window = webview.create_window(
         title='Good Vibes',
         url='gui/index.html',
-        js_api=api,
+        js_api=Api(),
         width=900,
         height=600,
         resizable=True,
