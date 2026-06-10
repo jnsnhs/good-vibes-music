@@ -789,6 +789,7 @@ document.getElementById('prev-btn').addEventListener('click', async () => {
     if (audioPlayer.currentTime > PREVIOUS_THRESHOLD) {
         audioPlayer.currentTime = 0;
         progressBar.value = audioPlayer.currentTime;
+        handleInput(e.target);
     } else {
         const targetIndex = getPreviousTrackIndex(currentTrackIndex);
         if (targetIndex !== -1) {
@@ -840,15 +841,18 @@ audioPlayer.addEventListener('timeupdate', () => {
     }
 });
 
-progressBar.addEventListener('input', () => {
+progressBar.addEventListener('input', (e) => {
     isDragging = true;
     currentTimeEl.innerText = formatTime(progressBar.value);
 });
 
-progressBar.addEventListener('change', () => {
+progressBar.addEventListener('change', (e) => {
     audioPlayer.currentTime = progressBar.value;
-    isDragging = false; 
+    isDragging = false;
 });
+
+
+
 
 let currentSort = { field: null, ascending: true };
 
@@ -1620,14 +1624,7 @@ document.getElementById('btn-save-grid-settings').addEventListener('click', () =
     renderAlbumGrid(); 
 });
 
-/* PROGRESS TRACKING HELPER FOR RANGE ELEMENTS*/
 
-for (let e of document.querySelectorAll('input[type="range"].slider-progress')) {
-  e.style.setProperty('--value', e.value);
-  e.style.setProperty('--min', e.min == '' ? '0' : e.min);
-  e.style.setProperty('--max', e.max == '' ? '100' : e.max);
-  e.addEventListener('input', () => e.style.setProperty('--value', e.value));
-}
 
 // ==========================================
 // UP NEXT QUEUE UI LOGIC

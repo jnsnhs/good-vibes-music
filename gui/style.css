@@ -3,9 +3,13 @@
    ========================================= */
 
 :root {
-  --green: #1db954;
-  --indigo: #544ddb;
+  --moody-indigo: #544ddb;
+  --dabade-blue: #2962FF;
   --fake-green: #00695C;
+
+  --default-light: #ebebeb;
+  --dabade-blue-light: #E3F2FD;
+  --moody-indigo-light: #E8EAF6;
 }
 
 @media (prefers-color-scheme: light) {
@@ -18,9 +22,9 @@
     --text-secondary: #515154;
     --text-muted: #86868b;
     --btn-icon-color: #747474;
-    --btn-range-color: #e2e2e2;
-    --btn-bg-hover-color: #ebebeb;
-    --accent: var(--fake-green);
+    --btn-range-color: var(--moody-indigo-light) ;/* #e2e2e2 */
+    --btn-bg-hover-color: var(--moody-indigo-light);
+    --accent: var(--moody-indigo);
     --border-color: #d2d2d7;
     --border-light: #e5e5ea;
     --danger: #ff3b30;
@@ -101,7 +105,7 @@ body {
   border-radius: 7px;
   height: 30px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.3s, transform 0s;
   display: flex;
   flex-direction: row;
   gap: 4px;
@@ -545,7 +549,7 @@ button.icon-btn svg.btn-icon {
 }
 
 #np-title {
-  color: var(--text-main);
+  color: var(--accent);
   font-weight: bold;
   width: 100%;
   font-size: 13px;
@@ -555,7 +559,7 @@ button.icon-btn svg.btn-icon {
 }
 
 #np-artist {
-  color: var(--text-secondary);
+  color: var(--accent);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -590,7 +594,7 @@ input#progress-bar {
 /* --- Webkit Browsers --- */
 input#progress-bar::-webkit-slider-runnable-track {
   height: 12px;
-  background-color: var(--btn-range-color);
+  background: linear-gradient(to right, var(--accent) var(--range-pct, 0%), var(--btn-range-color) var(--range-pct, 0%));  border-radius: 40px;
   border-radius: 40px;
   border: none;
 }
@@ -655,7 +659,7 @@ input#volume-bar::-webkit-slider-thumb {
   appearance: none;
   height: 12px;
   width: 12px;
-  background: var(--btn-icon-color);
+  background: var(--accent);
   border-radius: 40px;
   border: none;
 }
