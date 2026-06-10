@@ -37,10 +37,18 @@ const listContainer = document.getElementById('track-list-container');
 const trackList = document.getElementById('track-list');
 const LIST_VIEW_ROW_HEIGHT = 52; 
 const LIST_VIEW_ROW_BUFFER = 10; 
-const coverCache = {};
 
 const TWO_COLUMN_THRESHOLD = 1024;  // width of window in pixels
 
+// IMAGE URL GENERATOR
+
+// --- NEW: Fast Image URL Generator ---
+function getCoverUrl(coverHash) {
+    if (coverHash) {
+        return `http://127.0.0.1:65432/?art=${coverHash}`;
+    }
+    return 'placeholder.png';
+}
 
 // APPLICATION MENU
 
@@ -317,10 +325,6 @@ forceKeyboardFocusRelease();
 setGlobalKeyboardShortcuts();
 
 
-
-
-
-
 window.addEventListener('pywebviewready', async () => {
     try {
         const tracks = await window.pywebview.api.get_library();
@@ -361,8 +365,9 @@ function renderVirtualList() {
         li.style.transform = `translateY(${i * LIST_VIEW_ROW_HEIGHT}px)`;
         li.dataset.index = i; 
         li.className = `${isMissing}${isSelected}${isPlaying}`;
+        // width and height in img tag fixes console "intervention":
         li.innerHTML = `
-            <img class="track-cover" id="cover-${i}" src="${coverCache[track.file_path] || 'placeholder.png'}" alt="">
+            <img class="track-cover" id="cover-${i}" src="${getCoverUrl(track.cover_hash)}" alt="">
             <div class="track-title">${missingWarning}${track.title}</div>
             <div class="track-artist">${track.artist}</div>
             <div class="track-album">${track.album}</div>
@@ -370,26 +375,11 @@ function renderVirtualList() {
             <div class="track-duration">${track.duration}</div>
         `;
         fragment.appendChild(li);
-        if (!coverCache[track.file_path]) {
-            loadCoverArt(track.file_path, i);
-        }
     }
     trackList.innerHTML = '';
     trackList.appendChild(fragment);
 }
 
-async function loadCoverArt(filePath, index) {
-    try {
-        const base64Data = await window.pywebview.api.get_cover_on_demand(filePath);
-        if (base64Data) {
-            coverCache[filePath] = base64Data;
-            const imgElement = document.getElementById(`cover-${index}`);
-            if (imgElement) imgElement.src = base64Data;
-        }
-    } catch (e) {
-        console.error("Cover load failed", e);
-    }
-}
 
 
 
@@ -667,7 +657,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     }, 300); 
 });
 
-function playTrack(track, coverSrc) {
+function playTrack(track) {
     currentPlayingPath = track.file_path;
     
     // Always render list so it's accurate when switching back
@@ -699,7 +689,7 @@ function playTrack(track, coverSrc) {
     '</svg>';
     document.getElementById('np-title').innerText = track.title;
     document.getElementById('np-artist').innerText = track.artist;
-    document.getElementById('np-cover').src = coverSrc;
+    document.getElementById('np-cover').src = getCoverUrl(track.cover_hash);
 }
 
 document.getElementById('play-pause-btn').addEventListener('click', () => {
@@ -885,19 +875,6 @@ document.querySelectorAll('.col-sortable').forEach(header => {
 let trackBeingEdited = null;
 const contextMenu = document.getElementById('context-menu');
 
-async function getTrackCover(filePath) {
-    if (coverCache[filePath]) { return coverCache[filePath]; }
-    try {
-        const base64Data = await window.pywebview.api.get_cover_on_demand(filePath);
-        if (base64Data) {
-            coverCache[filePath] = base64Data; 
-            return base64Data;
-        }
-    } catch (e) {
-        console.error("Cover fetch failed during playback:", e);
-    }
-    return 'placeholder.png'; 
-}
 
 // --- NEW: QUEUE ARCHITECTURE ---
 
@@ -1009,8 +986,7 @@ async function requestPlayback(targetIndex, direction = 1, isManualClick = false
     }
 
     currentTrackIndex = targetIndex;
-    const coverSrc = await getTrackCover(track.file_path);
-    playTrack(track, coverSrc);
+    playTrack(track);
 }
 
 
@@ -1225,19 +1201,6 @@ function renderAlbumGrid() {
     
     const fragment = document.createDocumentFragment();
 
-    // Intersection Observer to lazy load covers as they scroll into view
-    const coverObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(async entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                const path = img.dataset.path;
-                const coverSrc = await getTrackCover(path);
-                img.src = coverSrc;
-                observer.unobserve(img);
-            }
-        });
-    }, { root: document.getElementById('grid-view-wrapper'), rootMargin: '200px' });
-
     let currentGroup = null; // NEW: Tracks the current decade or letter
 
 gridAlbums.forEach((album, idx) => {
@@ -1271,23 +1234,19 @@ gridAlbums.forEach((album, idx) => {
             currentGroup = albumGroup;
         }
     }
-    const card = document.createElement('div');
+        const card = document.createElement('div');
         card.className = 'album-card';
         card.dataset.index = idx;
-        
-        // Try cache first, otherwise use placeholder and observe
-        const cachedCover = coverCache[album.coverPath];
-        const imgSrc = cachedCover ? cachedCover : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
+        // Grab the hash from the very first track in the album
+        const hash = album.tracks[0].cover_hash;
+
+        // width and height in img tag fixes console "intervention":
         card.innerHTML = `
-            <img class="album-card-cover" src="${imgSrc}" data-path="${album.coverPath}" alt="">
+            <img class="album-card-cover" src="${getCoverUrl(hash)}" alt="">
             <div class="album-card-title">${album.title}</div>
             <div class="album-card-artist">${album.artist}</div>
         `;
-        
-        if (!cachedCover) {
-            coverObserver.observe(card.querySelector('img'));
-        }
 
         // Open expansion on click
         card.addEventListener('click', (e) => {
@@ -1409,12 +1368,14 @@ function openExpandedAlbum(albumData, cardElement) {
     // ==========================================
 
     const expansionContainer = document.createElement('div');
-        expansionContainer.className = 'album-expanded-row';
-        expansionContainer.id = 'active-expansion-row';
+    expansionContainer.className = 'album-expanded-row';
+    expansionContainer.id = 'active-expansion-row';
+
+    const hash = albumData.tracks[0].cover_hash;
 
     expansionContainer.innerHTML = `
         <div class="expanded-cover-container">
-            <img id="expanded-highres-cover" src="${coverCache[albumData.coverPath] || 'placeholder.png'}">
+            <img id="expanded-highres-cover" src="${getCoverUrl(hash)}">
             <div class="expanded-cover-meta">
                 ${albumData.tracks.length} Tracks • ${runtimeString}
             </div>
@@ -1436,10 +1397,6 @@ function openExpandedAlbum(albumData, cardElement) {
     // If nextSibling is null (end of list), it naturally appends to the bottom.
     const lastCardInRow = cards[insertIndex];
     albumGrid.insertBefore(expansionContainer, lastCardInRow.nextSibling);
-
-    getTrackCover(albumData.coverPath).then(src => {
-        document.getElementById('expanded-highres-cover').src = src;
-    });
 
     const expandedList = document.getElementById('expanded-track-list');
     
@@ -1688,7 +1645,7 @@ function renderQueuePopover() {
         const sourceIndex = isManual ? visualIndex : visualIndex - manualQueue.length;
 
         li.innerHTML = `
-            <img src="${coverCache[track.file_path] || 'placeholder.png'}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
+            <img src="${getCoverUrl(track.cover_hash)}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
             <div class="queue-item-info">
                 <div class="queue-item-title">${track.title}</div>
                 <div class="queue-item-artist">${track.artist}</div>

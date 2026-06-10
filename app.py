@@ -247,18 +247,6 @@ class Api:
             return {"status": "success", "new_path": new_path}
         return {"status": "cancelled"}
 
-    # def get_cover_on_demand(self, file_path):
-    #     conn = sqlite3.connect(LIBRARY_FILE)
-    #     c = conn.cursor()
-    #     c.execute(
-    #         "SELECT cover_base64 FROM tracks WHERE file_path = ?",
-    #         (file_path,))
-    #     row = c.fetchone()
-    #     conn.close()
-    #     if row and row[0]:
-    #         return row[0]
-    #     return None
-
     # 1. The Trigger Method
     def add_music(self):
         if self.import_state["is_running"]:
