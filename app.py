@@ -1,13 +1,13 @@
-import webview
-import sqlite3
-import music_tag
-import os
-import urllib.parse
-import threading
 import hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from tinytag import TinyTag
+import music_tag
+import os
+import sqlite3
+import threading
 import time
+from tinytag import TinyTag
+import urllib.parse
+import webview
 
 LIBRARY_FILE = "library.db"
 IMG_BROWSER_CACHE_DAYS = 30
@@ -280,13 +280,41 @@ class Api:
         conn = sqlite3.connect(LIBRARY_FILE)
         c = conn.cursor()
         placeholders = ','.join('?' for _ in file_paths)
+        hashes_to_check = self.identify_distinct_cover_hashes(c, file_paths)
         c.execute(
             f"DELETE FROM tracks WHERE file_path IN ({placeholders})",
             file_paths
         )
         conn.commit()
+        self.delete_orphaned_cover_art_from_hd(c, hashes_to_check)
         conn.close()
         return {"status": "success"}
+
+    def identify_distinct_cover_hashes(
+            self, c: sqlite3.Cursor, file_paths: list[str]
+            ) -> list[str]:
+        placeholders = ','.join('?' for _ in file_paths)
+        c.execute(
+            f"SELECT DISTINCT cover_hash FROM tracks WHERE \
+            file_path IN ({placeholders}) AND cover_hash IS NOT NULL",
+            file_paths)
+        return [row[0] for row in c.fetchall()]
+
+    def delete_orphaned_cover_art_from_hd(
+            self, c: sqlite3.Cursor, hashes_to_check: list[str]
+            ) -> None:
+        for h in hashes_to_check:
+            c.execute(
+                "SELECT COUNT(*) FROM tracks WHERE cover_hash = ?", (h,))
+            count = c.fetchone()[0]
+            if count == 0:
+                img_path = os.path.join("art_cache", f"{h}.jpg")
+                if os.path.exists(img_path):
+                    try:
+                        os.remove(img_path)
+                    except Exception as e:
+                        print("Failed to delete orphaned cover art "
+                              f"{img_path}: {e}")
 
     def update_metadata(
             self, file_paths: list[str], modified_data: dict
@@ -330,6 +358,9 @@ class Api:
 
     def check_file_exists(self, file_path: str) -> bool:
         return os.path.exists(file_path)
+
+    def quit_application(self):
+        window.destroy()
 
 
 def start_audio_server():
