@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="menu-bar">
 
+    <header class="menu-bar">
       <div id="view-btn-container" style="display: flex; gap: 15px; align-items: center">
         <div class="view-toggles" style="display: flex; gap: 5px">
           <button id="toggle-list-btn" class="view-btn active" title="View songs">
@@ -23,13 +23,11 @@
             </svg>
             Albums</button>
         </div>
-        <!-- <button
-          id="grid-settings-btn"
-          class="icon-btn hidden"
-          title="Grid Settings"
-        >
-          ⚙️
-        </button> -->
+        <button id="view-settings-btn" class="view-btn" title="View Settings">
+          <svg viewBox="0 -960 960 960">
+            <path d="M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm49-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z"/>
+          </svg>
+        </button>
       </div>
       <div id="status-text" style="display: none">0 tracks in library</div>
       <div id="search-input-container">
@@ -53,10 +51,9 @@
           </svg>
         </button>
       </div>
-
     </header>
 
-    <main class="library-container">
+    <main class="library-container" id="library-container">
       <div
         id="list-view-wrapper"
         style="display: flex; flex-direction: column; height: 100%"
@@ -85,6 +82,13 @@
     </main>
 
     <footer class="control-bar">
+      <div class="now-playing-container" id="now-playing-container">
+        <img id="np-cover" src="placeholder.png" alt="Cover" />
+        <div class="np-info">
+          <span id="np-title"></span>
+          <span id="np-artist"></span>
+        </div>
+      </div>
       <div class="playback-container">
         <button id="prev-btn" class="icon-btn" title="Previous Track">
           <svg class="btn-icon" viewBox="0 -960 960 960">
@@ -94,10 +98,12 @@
           </svg>
         </button>
         <button id="play-pause-btn" class="icon-btn" title="Play/Pause">
-          <svg class="btn-icon" viewBox="0 -960 960 960">
-            <path
-              d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"
+          <svg class="btn-icon" viewBox="0 -960 960 960" id="play-pause-btn-paused">
+            <path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"
             />
+          </svg>
+          <svg class="btn-icon" viewBox="0 -960 960 960" id="play-pause-btn-playing">
+            <path d="M640-200q-33 0-56.5-23.5T560-280v-400q0-33 23.5-56.5T640-760q33 0 56.5 23.5T720-680v400q0 33-23.5 56.5T640-200Zm-320 0q-33 0-56.5-23.5T240-280v-400q0-33 23.5-56.5T320-760q33 0 56.5 23.5T400-680v400q0 33-23.5 56.5T320-200Z"/>
           </svg>
         </button>
         <button id="next-btn" class="icon-btn" title="Next Track">
@@ -108,17 +114,8 @@
           </svg>
         </button>
       </div>
-
-      <div class="now-playing-container">
-        <img id="np-cover" src="placeholder.png" alt="Cover" />
-        <div class="np-info">
-          <span id="np-title">No track selected</span>
-          <span id="np-artist">-</span>
-        </div>
-      </div>
-
       <div class="progress-container">
-        <span id="current-time">0:00</span>
+        <span id="current-time">00:00</span>
         <input
           type="range"
           id="progress-bar"
@@ -128,9 +125,8 @@
           max="100"
           step="1"
         />
-        <span id="total-time">0:00</span>
+        <span id="total-time">00:00</span>
       </div>
-
       <div class="playback-modes-container">
         <button id="shuffle-btn" class="icon-btn" title="Shuffle">
           <svg class="btn-icon" viewBox="0 -960 960 960">
@@ -154,7 +150,6 @@
           </svg>
         </button>
       </div>
-
       <div class="volume-container">
         <button
           id="volume-btn"
@@ -172,9 +167,13 @@
       </div>
     </footer>
 
-    <div id="context-menu" class="hidden">
-      <div class="context-item" id="ctx-play-next">Play Next</div>
-      <div class="context-item" id="ctx-edit">Edit Metadata</div>
+    <div id="context-menu" class="context-menu hidden">
+      <div class="context-item" id="ctx-play-next">
+        Play Next
+      </div>
+      <div class="context-item" id="ctx-edit">
+        Edit Metadata
+      </div>
       <div class="context-item delete-text" id="ctx-remove">
         Remove from Library
       </div>
@@ -247,10 +246,10 @@
           <span class="app-menu-item">Settings</span>
           <span class="app-menu-shortcut"><kbd>CTRL</kbd>+<kbd>,</kbd></span>
         </li>
-        <li>
+        <!-- <li>
           <span class="app-menu-item">About</span>
-        </li>
-        <li>
+        </li> -->
+        <li id="quit-app-menu-item">
           <span class="app-menu-item">Exit</span>
           <span class="app-menu-shortcut"><kbd>CTRL</kbd>+<kbd>Q</kbd></span>
         </li>
@@ -415,6 +414,16 @@
             Cancel
           </button>
           <button id="btn-save-app-settings" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-modal" class="hidden">
+      <div class="modal-content" style="width: 350px">
+        <h2 id="error-modal-title"></h2>
+        <div id="error-modal-message"></div>
+        <div class="modal-actions">
+          <button id="error-modal-ok-btn" class="primary-btn">Ok</button>
         </div>
       </div>
     </div>
