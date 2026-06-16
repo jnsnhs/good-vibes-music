@@ -2,7 +2,10 @@ let currentTrackIndex = -1;
 let selectedPaths = new Set(); 
 let lastClickedIndex = null;
 let lastGridClickedIndex = null; // NEW: Tracks shift-click anchors exclusively for the Album Grid
-let currentPlayingPath = null; 
+let currentPlayingPath = null;
+
+let dimmedCoverArt = true;
+let savedAccent = 'blue';
 
 const doubleClickDelay = 200;
 let doubleClickOnTrackPossible = false;
@@ -17,10 +20,6 @@ let searchDebounceTimeout;
 
 const playPauseBtnPausedIcon = document.getElementById('play-pause-btn-paused');
 const playPauseBtnPlayingIcon = document.getElementById('play-pause-btn-playing');
-
-const queuePopover = document.getElementById('queue-popover');
-const queueList = document.getElementById('queue-list');
-const queueFooter = document.getElementById('queue-footer');
 
 const COVER_PLACEHOLDER_PATH = 'placeholder.png';
 const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
@@ -95,8 +94,7 @@ class TrackContextMenu {
         const playNextItem = document.getElementById('ctx-play-next');
         playNextItem.addEventListener('click', () => {
             const pathsArray = Array.from(selectedPaths);
-            const indexes = pathsArray.map(path => musicLibrary.data.findIndex(t => t.file_path === path)).filter(i => i !== -1);
-            manualQueue = indexes.concat(manualQueue);
+            manualQueue = pathsArray.concat(manualQueue);
             document.getElementById('context-menu').classList.add('hidden');
             if (!queuePopover.classList.contains('hidden')) {
                 renderQueuePopover();
@@ -329,20 +327,24 @@ class ViewSettingsModal {
 
 class AppSettingsModal {
     constructor() {
+        this.accentThemes = {
+            green: '#1db954',
+            blue: '#007aff',
+            red: '#ff3b30'
+        };
         this.id = 'app-settings-modal';
         this.container = document.getElementById(this.id);
         this.audio_normalization_checkbox = document.getElementById(
             'settings-audio-normalization');
+        this.dimmed_coverart_checkbox = document.getElementById(
+            'settings-dimmed-coverart');
+        this.selectDropdown = document.getElementById('accent-color-select');
         this.addEventListeners();
     }
     addEventListeners() {
         const saveBtn = document.getElementById('btn-save-app-settings');
         saveBtn.addEventListener('click', () => {
-            initWebAudio();
-            if (isNormalized != this.audio_normalization_checkbox.checked) {
-                isNormalized = this.audio_normalization_checkbox.checked;
-                this.applyAudioOptions();
-            }
+            this.save();
             this.hide();
         });
         const cancelBtn = document.getElementById('btn-cancel-app-settings');
@@ -361,9 +363,50 @@ class AppSettingsModal {
             audioSource.connect(audioCtx.destination);
         }
     }
+    applyVisualOptions() {
+        //.album-card-cover
+        const expandedCover = document.getElementById('expanded-highres-cover');
+        if (expandedCover) {
+            if (dimmedCoverArt) {
+                expandedCover.classList.add('dimmed');
+            } else {
+                expandedCover.classList.remove('dimmed');
+            }
+        }
+        document.querySelectorAll('.album-card-cover').forEach(c => {
+            if (dimmedCoverArt) {
+                c.classList.add('dimmed');
+            } else {
+                c.classList.remove('dimmed');
+            }
+        });
+    }
+    applyAccentTheme(colorName) {
+        const hexValue = this.accentThemes[colorName] || this.accentThemes.green;
+        document.documentElement.style.setProperty('--accent', hexValue);
+        // localStorage.setItem('selected-accent-theme', colorName);
+    }
     show() {
         this.container.classList.remove('hidden');
         this.audio_normalization_checkbox.checked = isNormalized;
+        this.dimmed_coverart_checkbox.checked = dimmedCoverArt;
+        if (this.selectDropdown) {
+            this.selectDropdown.value = savedAccent;
+        }
+
+    }
+    save() {
+        initWebAudio();
+        if (isNormalized != this.audio_normalization_checkbox.checked) {
+            isNormalized = this.audio_normalization_checkbox.checked;
+            this.applyAudioOptions();
+        }
+        if (dimmedCoverArt != this.dimmed_coverart_checkbox.checked) {
+            dimmedCoverArt = this.dimmed_coverart_checkbox.checked;
+            this.applyVisualOptions();
+        }
+        savedAccent = this.selectDropdown.value;
+        this.applyAccentTheme(savedAccent);
     }
     hide() {
         this.container.classList.add('hidden');
@@ -376,10 +419,11 @@ class AppSettingsModal {
 
 class Gui {
     constructor() {
-        this.currentView = 'list'; // NEW: Tracks 'list' or 'grid'
+        this.currentView = 'list';  // list or grid
 
         this.songsViewBtn = document.getElementById('toggle-list-btn');
         this.albumsViewBtn = document.getElementById('toggle-grid-btn');
+        this.searchField = document.getElementById('search-input');
         this.addMusicBtn = document.getElementById('add-music-btn');
         
         this.appMenuBtn = document.getElementById('application-menu-btn');
@@ -464,8 +508,7 @@ class GuiController {
         }
     }
     initSearchField() {
-        const searchField = document.getElementById('search-input')
-        searchField.addEventListener('input', (e) => {
+        gui.searchField.addEventListener('input', (e) => {
             clearTimeout(searchDebounceTimeout);
             searchDebounceTimeout = setTimeout(() => {
                 const query = e.target.value.trim();
@@ -482,29 +525,22 @@ class GuiController {
                         });
                     });
                 }
-                document.getElementById('track-list-container').scrollTop = 0;
                 if (gui.currentView === 'list') {
+                    document.getElementById('track-list-container').scrollTop = 0;
                     songsView.renderVirtualList();
                 } else {
-                    albumsView.renderAlbumGrid();
+                    albumsView.renderAlbumGrid(); 
                 }
+                refreshDynamicQueue();
             }, SEARCH_DEBOUNCE_TIME); 
-        });
-        searchField.addEventListener('input', (e) => {
-            if (gui.currentView === 'list') {
-                document.getElementById('track-list-container').scrollTop = 0;
-                songsView.renderVirtualList();
-            } else {
-                albumsView.renderAlbumGrid();
-            }
         });
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
                 if (!GuiHelper.isAnyModalOpen()) {
                     e.preventDefault();
                     if (searchField) {
-                        searchField.focus();
-                        searchField.select(); 
+                        gui.searchField.focus();
+                        gui.searchField.select(); 
                     }
                 }
             }
@@ -512,7 +548,7 @@ class GuiController {
     }
     initApplicationMenuBtn() {
         gui.appMenuBtn.addEventListener('mousedown', (e) => {
-            queuePopover.classList.add('hidden');
+            queuePopover.container.classList.add('hidden');
             e.stopPropagation();
             if (gui.applicationMenu.isHidden) {
                 gui.applicationMenu.setHidden = false;
@@ -554,9 +590,8 @@ class GuiController {
             e.target.classList.toggle('active', isShuffle);
             if (currentTrackIndex !== -1) {
                 buildContextQueue(currentTrackIndex);
-                const queuePopover = document.getElementById('queue-popover');
-                if (queuePopover && !queuePopover.classList.contains('hidden')) {
-                    renderQueuePopover();
+                if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+                    queuePopover.render();
                 }
             }
             if (isShuffle) {
@@ -610,34 +645,35 @@ class GuiController {
         gui.queueBtn.addEventListener('mousedown', (e) => {
             gui.applicationMenu.sethidden = true;
             e.stopPropagation(); 
-            queuePopover.classList.toggle('hidden');
-            if (!queuePopover.classList.contains('hidden')) {
-                renderQueuePopover();
+            queuePopover.container.classList.toggle('hidden');
+            if (!queuePopover.container.classList.contains('hidden')) {
+                queuePopover.render();
             }
         });
         document.addEventListener('mousedown', (e) => {
-            if (!queuePopover.classList.contains('hidden') && !queuePopover.contains(e.target) && e.target !== gui.queueBtn && !gui.queueBtn.contains(e.target)) {
-                queuePopover.classList.add('hidden');
+            if (!queuePopover.container.classList.contains('hidden') && !queuePopover.container.contains(e.target) && e.target !== gui.queueBtn && !gui.queueBtn.contains(e.target)) {
+                queuePopover.container.classList.add('hidden');
             }
         });
     }
     initNextBtn() {
         gui.nextBtn.addEventListener('click', async () => {
-            const targetIndex = popNextTrackFromQueue();
-            if (targetIndex !== -1) await requestPlayback(targetIndex, 1, false);
+            const targetPath = popNextTrackFromQueue();
+            if (targetPath) await requestPlayback(targetPath, 1, false);
         });
     }
     initPrevBtn() {
         gui.prevBtn.addEventListener('click', async () => {
+            if (!currentPlayingPath) return;
             if (audioPlayer.currentTime > SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
                 audioPlayer.currentTime = 0;
                 gui.progressBar.value = audioPlayer.currentTime;
             } else {
-                const targetIndex = getPreviousTrackIndex(currentTrackIndex);
-                if (targetIndex !== -1) {
+                const targetPath = getPreviousTrackPath(currentPlayingPath);
+                if (targetPath) {
                     manualQueue = [];
-                    buildContextQueue(targetIndex);
-                    await requestPlayback(targetIndex, -1, false);
+                    buildContextQueue(targetPath);
+                    await requestPlayback(targetPath, -1, false);
                 }
             }
         });
@@ -648,7 +684,7 @@ class GuiController {
         gui.progressBar.disabled = true;
         gui.progressBar.addEventListener('input', (e) => {
             this.isUserDraggingProgressHandle = true;
-            gui.currentTimeEl.innerText = formatTime(gui.progressBar.value);
+            gui.currentTimeEl.innerText = Utils.formatTime(gui.progressBar.value);
         });
         gui.progressBar.addEventListener('change', (e) => {
             audioPlayer.currentTime = gui.progressBar.value;
@@ -656,9 +692,9 @@ class GuiController {
         });
         audioPlayer.addEventListener('timeupdate', () => {
             if (this.isUserDraggingProgressHandle) return; 
-            gui.currentTimeEl.innerText = formatTime(audioPlayer.currentTime);
+            gui.currentTimeEl.innerText = Utils.formatTime(audioPlayer.currentTime);
             if (audioPlayer.duration) {
-                gui.totalTimeEl.innerText = formatTime(audioPlayer.duration);
+                gui.totalTimeEl.innerText = Utils.formatTime(audioPlayer.duration);
                 gui.progressBar.max = audioPlayer.duration;
                 gui.progressBar.value = audioPlayer.currentTime;
             }
@@ -1133,7 +1169,10 @@ class AlbumsView {
             } else {
                 window.getSelection().removeAllRanges(); 
                 playbackContext = { type: 'album', key: albumData.key };
-                requestPlayback(parseInt(li.dataset.index), 1, true);
+                staticAlbumPool = albumData.tracks.map(
+                    t => t.file_path
+                );
+                requestPlayback(li.dataset.filepath, 1, true);
             }    
         });
         expandedList.addEventListener('contextmenu', (e) => {
@@ -1188,6 +1227,12 @@ class Utils {
         } else {
             return `${m+1} min`;
         }
+    }
+    static formatTime(seconds) {
+        if (isNaN(seconds)) return "0:00";
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 }
 
@@ -1373,11 +1418,91 @@ class SearchEngine {
 }    
 
 
-const gui = new Gui();
-const guiController = new GuiController();
-const musicLibrary = new MusicLibrary();
-const songsView = new SongsView();
-const albumsView = new AlbumsView();
+class QueuePopover {
+
+    constructor() {
+        this.id = 'queue-popover';
+        this.container = document.getElementById(this.id);
+        this.queueList = document.getElementById('queue-list');
+        this.queueFooter = document.getElementById('queue-footer');
+        this.displayLimit = 20;
+        this.initClearQueueBtn();
+    }
+
+    initClearQueueBtn() {
+        const clearQueueBtn = document.getElementById('clear-queue-btn');
+        clearQueueBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            manualQueue = [];
+            contextQueue = [];
+            this.render();
+        });
+    }
+
+    render() {
+        this.queueList.innerHTML = '';   
+        const combinedQueue = manualQueue.concat(contextQueue); 
+        this.visuallyCombineQueues(combinedQueue);
+        this.initRemovalButtons();
+        this.updateFooterText(combinedQueue);
+        if (combinedQueue.length === 0) {
+            this.displayEmptyList();
+        }
+    }
+
+    visuallyCombineQueues(combinedQueue) {
+        const displayQueue = combinedQueue.slice(0, this.displayLimit);
+        displayQueue.forEach((trackIndex, visualIndex) => {
+            const track = musicLibrary.data[trackIndex];
+            if (!track) return;
+            const li = document.createElement('li');
+            const isManual = visualIndex < manualQueue.length;
+            const sourceArray = isManual ? 'manual' : 'context';
+            const sourceIndex = isManual ? visualIndex : visualIndex - manualQueue.length;
+            li.innerHTML = `
+                <img src="${GuiHelper.getCoverUrl(track.cover_hash)}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${track.title}</div>
+                    <div class="queue-item-artist">${track.artist}</div>
+                </div>
+                <button class="queue-remove-btn" data-source="${sourceArray}" data-index="${sourceIndex}" title="Remove">✖</button>
+            `;
+            this.queueList.appendChild(li);
+        });
+    }
+
+    displayEmptyList() {
+        this.queueList.innerHTML = '<li style="text-align: center; color: var(--text-muted); display: block; padding: 30px;">Queue is empty</li>';
+    }
+
+    updateFooterText(combinedQueue) {
+        const remaining = combinedQueue.length - this.displayLimit;
+        if (remaining > 0) {
+            this.queueFooter.innerText = `... and ${remaining} more tracks`;
+            this.queueFooter.classList.remove('hidden');
+        } else {
+            this.queueFooter.classList.add('hidden');
+        }
+    }
+
+    initRemovalButtons() {
+        this.queueList.querySelectorAll('.queue-remove-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const src = btn.dataset.source;
+                const idx = parseInt(btn.dataset.index);
+                if (src === 'manual') {
+                    manualQueue.splice(idx, 1);
+                } else {
+                    contextQueue.splice(idx, 1);
+                }
+                this.render();
+            });
+        });
+    }
+
+}
+
 
 
 
@@ -1443,7 +1568,7 @@ function buildContextQueue(startPath) { // returns queue array
     let pool = getPoolOfAllowedTracks();
     let poolIndex = pool.indexOf(startPath);
     if (poolIndex === -1) {
-        return []; 
+        contextQueue = []; 
     }
     let remaining = pool.slice(poolIndex + 1);
     if (isShuffle) {
@@ -1452,7 +1577,7 @@ function buildContextQueue(startPath) { // returns queue array
             [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
         }
     }
-    return remaining;
+    contextQueue = remaining;
 }
 
 function popNextTrackFromQueue() {
@@ -1500,13 +1625,12 @@ function getPreviousTrackPath(startPath) {
     return pool[poolIndex - 1];
 }
 
-function refreshDynanmicQueue() {
+function refreshDynamicQueue() {
     // ONLY rebuild if the user is listening to a List. Albums remain static!
     if (playbackContext.type === 'list' && currentPlayingPath) {
         buildContextQueue(currentPlayingPath);
-        const queuePopover = document.getElementById('queue-popover');
-        if (queuePopover && !queuePopover.classList.contains('hidden')) {
-            renderQueuePopover();
+        if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+            queuePopover.render();
         }
     }
 }
@@ -1563,8 +1687,7 @@ class MyAudioPlayer {
 
 const myAudioPlayer = new MyAudioPlayer();
 
-
-async function doubleClickOnTrack(e) {
+async function doubleClickOnTrack_OLD(e) {
     const row = e.target.closest('li');
     if (!row) return;
     const trackIndex = parseInt(row.dataset.index);
@@ -1573,7 +1696,7 @@ async function doubleClickOnTrack(e) {
     await requestPlayback(trackIndex, 1, true);
 }
 
-async function doubleClickOnTrack_NEW(e) {
+async function doubleClickOnTrack(e) {
     const row = e.target.closest('li');
     if (!row) return;
     const trackIndex = parseInt(row.dataset.index);
@@ -1594,9 +1717,8 @@ function playTrack(track) {
             else li.classList.remove('track-playing');
         });
     }
-    const queuePopover = document.getElementById('queue-popover');
-    if (queuePopover && !queuePopover.classList.contains('hidden')) {
-        renderQueuePopover();
+    if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+        queuePopover.render();
     }
     initWebAudio(); 
     const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
@@ -1619,31 +1741,19 @@ audioPlayer.addEventListener('ended', async () => {
         audioPlayer.play();
         return;
     }
-    const targetIndex = popNextTrackFromQueue();
-    if (targetIndex !== -1) {
-        await requestPlayback(targetIndex, 1, false);
+    const targetPath = popNextTrackFromQueue();
+    if (targetPath) {
+        await requestPlayback(targetPath, 1, false);
     } else {
         isPlaying = false;
         playPauseBtnPausedIcon.style.display = 'block';
         playPauseBtnPlayingIcon.style.display = "none";
-        audioPlayer.currentTime = 0;
         gui.currentTimeEl.style.visibility = 'hidden';
         gui.totalTimeEl.style.visibility = 'hidden';
         gui.progressBar.disabled = true;
+        audioPlayer.currentTime = 0;
     }
 });
-
-function formatTime(seconds) {
-    if (isNaN(seconds)) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-}
-
-
-
-
-
 
 
 
@@ -1667,6 +1777,7 @@ function sortLibrary(field) {
         return 0;
     });
     songsView.renderVirtualList();
+    refreshDynamicQueue();
 }
 
 document.querySelectorAll('.col-sortable').forEach(header => {
@@ -1678,80 +1789,80 @@ document.querySelectorAll('.col-sortable').forEach(header => {
 // --- NEW: QUEUE ARCHITECTURE ---
 
 // 1. Gathers the pool of allowed tracks based on current context
-function getPool() {
-    if (playbackContext.type === 'album') {
-        const album = albumsView.gridAlbumsParsedData.find(a => a.key === playbackContext.key);
-        if (album) return album.tracks.map(t => t.globalIndex);
-    }
-    return musicLibrary.data.map((_, i) => i);
-}
+// function getPool() {
+//     if (playbackContext.type === 'album') {
+//         const album = albumsView.gridAlbumsParsedData.find(a => a.key === playbackContext.key);
+//         if (album) return album.tracks.map(t => t.globalIndex);
+//     }
+//     return musicLibrary.data.map((_, i) => i);
+// }
 
 // 2. Builds the automatic remaining queue, handling Shuffle automatically
-function buildContextQueue(startIndex) {
-    let pool = getPool();
-    let poolIndex = pool.indexOf(startIndex);
-    if (poolIndex === -1) poolIndex = 0;
+// function buildContextQueue(startIndex) {
+//     let pool = getPool();
+//     let poolIndex = pool.indexOf(startIndex);
+//     if (poolIndex === -1) poolIndex = 0;
 
-    let remaining = pool.slice(poolIndex + 1);
+//     let remaining = pool.slice(poolIndex + 1);
 
-    // If shuffle is active, generate the random sequence right now!
-    if (isShuffle) {
-        for (let i = remaining.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-        }
-    }
-    contextQueue = remaining;
-}
+//     // If shuffle is active, generate the random sequence right now!
+//     if (isShuffle) {
+//         for (let i = remaining.length - 1; i > 0; i--) {
+//             const j = Math.floor(Math.random() * (i + 1));
+//             [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+//         }
+//     }
+//     contextQueue = remaining;
+// }
 
 // 3. Replaces direction === 1 logic (Pulls next track from the queues)
-function popNextTrackFromQueue() {
-    // Priority 1: User queued tracks
-    while (manualQueue.length > 0) {
-        const nextIndex = manualQueue.shift();
-        if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
-    }
-    // Priority 2: Standard Context queue
-    while (contextQueue.length > 0) {
-        const nextIndex = contextQueue.shift();
-        if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
-    }
-    // Priority 3: End of queue reached, handle Repeat All
-    if (repeatMode === 'all') {
-        let pool = getPool();
-        if (pool.length > 0) {
-            let firstIndex = pool[0];
-            if (isShuffle) {
-                let shuffled = [...pool];
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                }
-                firstIndex = shuffled.shift();
-                contextQueue = shuffled;
-            } else {
-                contextQueue = pool.slice(1);
-            }
-            if (musicLibrary.data[firstIndex] && !musicLibrary.data[firstIndex].missing) return firstIndex;
-            // If the first is missing, it will organically drop to the next one on the subsequent request
-            return firstIndex;
-        }
-    }
-    return -1;
-}
+// function popNextTrackFromQueue() {
+//     // Priority 1: User queued tracks
+//     while (manualQueue.length > 0) {
+//         const nextIndex = manualQueue.shift();
+//         if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
+//     }
+//     // Priority 2: Standard Context queue
+//     while (contextQueue.length > 0) {
+//         const nextIndex = contextQueue.shift();
+//         if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
+//     }
+//     // Priority 3: End of queue reached, handle Repeat All
+//     if (repeatMode === 'all') {
+//         let pool = getPool();
+//         if (pool.length > 0) {
+//             let firstIndex = pool[0];
+//             if (isShuffle) {
+//                 let shuffled = [...pool];
+//                 for (let i = shuffled.length - 1; i > 0; i--) {
+//                     const j = Math.floor(Math.random() * (i + 1));
+//                     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+//                 }
+//                 firstIndex = shuffled.shift();
+//                 contextQueue = shuffled;
+//             } else {
+//                 contextQueue = pool.slice(1);
+//             }
+//             if (musicLibrary.data[firstIndex] && !musicLibrary.data[firstIndex].missing) return firstIndex;
+//             // If the first is missing, it will organically drop to the next one on the subsequent request
+//             return firstIndex;
+//         }
+//     }
+//     return -1;
+// }
 
 // 4. Replaces direction === -1 logic (Going backwards safely)
-function getPreviousTrackIndex(startIndex) {
-    let pool = getPool();
-    let poolIndex = pool.indexOf(startIndex);
-    if (poolIndex <= 0) {
-        if (repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
-        return -1;
-    }
-    return pool[poolIndex - 1];
-}
+// function getPreviousTrackIndex(startIndex) {
+//     let pool = getPool();
+//     let poolIndex = pool.indexOf(startIndex);
+//     if (poolIndex <= 0) {
+//         if (repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
+//         return -1;
+//     }
+//     return pool[poolIndex - 1];
+// }
 
-async function requestPlayback(targetIndex, direction = 1, isManualClick = false) {
+async function requestPlayback_OLD(targetIndex, direction = 1, isManualClick = false) {
     if (musicLibrary.data.length === 0 || targetIndex === -1) return;
     const track = musicLibrary.data[targetIndex];
     const exists = await window.pywebview.api.check_file_exists(track.file_path);
@@ -1774,7 +1885,7 @@ async function requestPlayback(targetIndex, direction = 1, isManualClick = false
                 requestPlayback(nextValidIndex, direction, false);
             }
         }
-        return; 
+        return;
     }
 
     if (isManualClick) {
@@ -1786,86 +1897,48 @@ async function requestPlayback(targetIndex, direction = 1, isManualClick = false
     playTrack(track);
 }
 
+async function requestPlayback(targetPath, direction = 1, isManualClick = false) {
+    if (musicLibrary.data.length === 0 || !targetPath) return;
+    const track = musicLibrary.masterData.find(t => t.file_path === targetPath);
+    if (!track) return;
 
-
-
-
-
-
-
-
-
-
-// ==========================================
-// UP NEXT QUEUE UI LOGIC
-// ==========================================
-
-document.getElementById('clear-queue-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    manualQueue = [];
-    contextQueue = [];
-    renderQueuePopover();
-});
-
-function renderQueuePopover() {
-    queueList.innerHTML = '';    
-    // Visually combine the queues
-    const combinedQueue = manualQueue.concat(contextQueue);
-    const displayLimit = 20;
-    const displayQueue = combinedQueue.slice(0, displayLimit);
-    displayQueue.forEach((trackIndex, visualIndex) => {
-        const track = musicLibrary.data[trackIndex];
-        if (!track) return;
-        const li = document.createElement('li');
-        // Determine whether this track belongs to the manual or context queue so we can safely delete it
-        const isManual = visualIndex < manualQueue.length;
-        const sourceArray = isManual ? 'manual' : 'context';
-        const sourceIndex = isManual ? visualIndex : visualIndex - manualQueue.length;
-        li.innerHTML = `
-            <img src="${GuiHelper.getCoverUrl(track.cover_hash)}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
-            <div class="queue-item-info">
-                <div class="queue-item-title">${track.title}</div>
-                <div class="queue-item-artist">${track.artist}</div>
-            </div>
-            <button class="queue-remove-btn" data-source="${sourceArray}" data-index="${sourceIndex}" title="Remove">✖</button>
-        `;
-        queueList.appendChild(li);
-    });
-    // Wire up Removal Buttons
-    queueList.querySelectorAll('.queue-remove-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const src = btn.dataset.source;
-            const idx = parseInt(btn.dataset.index);
-            if (src === 'manual') manualQueue.splice(idx, 1);
-            else contextQueue.splice(idx, 1);
-            renderQueuePopover();
-        });
-    });
-    // Update Footer Text
-    const remaining = combinedQueue.length - displayLimit;
-    if (remaining > 0) {
-        queueFooter.innerText = `... and ${remaining} more tracks`;
-        queueFooter.classList.remove('hidden');
-    } else {
-        queueFooter.classList.add('hidden');
+    const exists = await window.pywebview.api.check_file_exists(track.file_path);
+    if (!exists) {
+        track.missing = true;
+        songsView.renderVirtualList();
+        if (isManualClick) {
+            if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
+                const response = await window.pywebview.api.locate_missing_file(track.file_path);
+                if (response.status === 'success') {
+                    const newPath = response.new_path;
+                    const replacePath = (arr) => arr.map(p => p === targetPath ? newPath : p);
+                    manualQueue = replacePath(manualQueue);
+                    contextQueue = replacePath(contextQueue);
+                    staticAlbumPool = replacePath(staticAlbumPool);
+                    track.file_path = newPath;
+                    track.missing = false;
+                    songsView.renderVirtualList(); 
+                    requestPlayback(newPath, direction, isManualClick);
+                }
+            }
+        } else {
+            console.warn(`Skipping missing track: ${track.title}`);
+            const nextValidPath = direction === 1 ? popNextTrackFromQueue() : getPreviousTrackPath(targetPath);
+            if (nextValidPath && nextValidPath !== targetPath) {
+                requestPlayback(nextValidPath, direction, false);
+            }
+        }
+        return; 
     }
-    // Empty State
-    if (combinedQueue.length === 0) {
-        queueList.innerHTML = '<li style="text-align: center; color: var(--text-muted); display: block; padding: 30px;">Queue is empty</li>';
+    if (isManualClick) {
+        manualQueue = [];
+        buildContextQueue(targetPath);
+        console.log('targetPath: ' + targetPath);
+        console.log('contextQueue (0-9): ' + contextQueue.slice(0, 9))
     }
+
+    playTrack(track);
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1956,3 +2029,15 @@ function clearSelection() { // visual and logical
 }
 
 forceKeyboardFocusRelease();
+
+
+
+
+
+const gui = new Gui();
+const guiController = new GuiController();
+const musicLibrary = new MusicLibrary();
+const songsView = new SongsView();
+const albumsView = new AlbumsView();
+const queuePopover = new QueuePopover();
+

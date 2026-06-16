@@ -12,6 +12,9 @@
   --default-light: #ebebeb;
   --dabade-blue-light: #E3F2FD;
   --moody-indigo-light: #E8EAF6;
+
+
+  --accent: #505050;
 }
 
 @media (prefers-color-scheme: light) {
@@ -28,8 +31,8 @@
     --btn-icon-color: #505050;
     --btn-range-color: var(--default-light) ;/* #e2e2e2 */
     --btn-bg-hover-color: var(--default-light);
-    
-    --accent: var(--dabade-blue);
+
+    --accent-light-mode: var(var(--accent));
 
     --border-color: #d2d2d7;
     --border-light: #e5e5ea;
@@ -62,7 +65,7 @@
     --btn-range-color: #333 ;/* #e2e2e2 */
     --btn-bg-hover-color: #333;
 
-    --accent: var(--indigo);
+    --accent-dark-mode: var(var(--accent));
     
     --border-color: #333333;
     --border-light: #2a2a2a;
@@ -71,7 +74,7 @@
     --danger: #ff4d4d;
   }
   .dimmed {
-    filter: brightness(75%);
+    filter: brightness(66%);
   }
 
   #application-menu, .context-menu {
@@ -677,7 +680,7 @@ input#progress-bar::-webkit-slider-thumb {
   appearance: none;
   height: 12px;
   width: 12px;
-  background-color: var(--btn-icon-color);
+  background-color: var(--accent);
   border-radius: 40px;
   border: none;
 }
@@ -1190,4 +1193,85 @@ kbd {
   font-size: 0.8rem;
   padding: 0.1em 0.3em;
   border-radius: 0.3em;
+}
+
+.accent-picker-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.accent-pill-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.accent-pill-btn:hover {
+  color: var(--text-main);
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.accent-pill-btn.active {
+  border-color: var(--accent);
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Subtle accent color indicator dots */
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.green-dot { background-color: #1db954; }
+.blue-dot { background-color: #007aff; }
+.red-dot { background-color: #ff3b30; }
+
+
+.input-group select.custom-select {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 30px 8px 10px;
+  border-radius: 4px;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  
+  /* Removes default OS rendering */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  
+  /* Sleek, adaptive system dropdown arrow */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color 0.2s;
+}
+
+.input-group select.custom-select:focus {
+  border-color: var(--accent);
+}
+
+/* Style the native option dropdown panel background */
+.input-group select.custom-select option {
+  background-color: var(--bg-panel);
+  color: var(--text-main);
 }
