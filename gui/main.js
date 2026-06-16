@@ -1,9 +1,11 @@
 let currentTrackIndex = -1; 
 let selectedPaths = new Set(); 
 let lastClickedIndex = null;
-let lastGridClickedIndex = null; // NEW: Tracks shift-click anchors exclusively for the Album Grid
+let lastGridClickedIndex = null;
 let currentPlayingPath = null;
 
+const SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
+const SEARCH_DEBOUNCE_TIME = 300;
 let dimmedCoverArt = true;
 let savedAccent = 'blue';
 
@@ -14,8 +16,6 @@ let trackBeingEdited = null;
 
 let currentSort = { field: null, ascending: true };
 
-const SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
-const SEARCH_DEBOUNCE_TIME = 300;
 let searchDebounceTimeout;
 
 const playPauseBtnPausedIcon = document.getElementById('play-pause-btn-paused');
@@ -26,6 +26,7 @@ const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/20
 
 
 class ApplicationMenu {
+
     constructor() {
         this.container = document.getElementById('application-menu');
         this.settingsItem = document.getElementById('app-settings-menu-item');
@@ -42,6 +43,7 @@ class ApplicationMenu {
         });
         this.hidden = true;
     }
+
     initSettingsItem() {
         if (this.settingsItem) {
             this.settingsItem.addEventListener('mouseup', () => {
@@ -58,6 +60,7 @@ class ApplicationMenu {
             }
         });
     }
+
     initExitItem() {
         if (this.exitItem) {
             this.exitItem.addEventListener('mouseup', (e) => {
@@ -65,9 +68,11 @@ class ApplicationMenu {
             });
         }
     }
+
     get isHidden() {
         return this.hidden;
     }
+
     set setHidden(boolVal) {
         if (boolVal == true) {
             this.container.classList.add('hidden');
@@ -80,6 +85,7 @@ class ApplicationMenu {
 
 
 class TrackContextMenu {
+
     constructor() {
         this.id = 'context-menu';
         this.container = document.getElementById(this.id);
@@ -90,17 +96,19 @@ class TrackContextMenu {
             this.hide();
         });
     }
+
     initPlayNextItem() {
         const playNextItem = document.getElementById('ctx-play-next');
         playNextItem.addEventListener('click', () => {
             const pathsArray = Array.from(selectedPaths);
-            manualQueue = pathsArray.concat(manualQueue);
+            myAudioPlayer.manualQueue = pathsArray.concat(myAudioPlayer.manualQueue);
             document.getElementById('context-menu').classList.add('hidden');
             if (!queuePopover.classList.contains('hidden')) {
                 renderQueuePopover();
             }
         });
     }
+
     initRemoveItem() {
         const removeItem = document.getElementById('ctx-remove');
         removeItem.addEventListener('click', async () => {
@@ -127,6 +135,7 @@ class TrackContextMenu {
             }
         });
     }
+
     initEditItem() {
         const editItem = document.getElementById('ctx-edit');
         editItem.addEventListener('click', () => {
@@ -136,6 +145,7 @@ class TrackContextMenu {
             gui.trackContextMenu.show();
         });
     }
+
     show(e) {
         this.container.style.opacity = '0';
         this.container.classList.remove('hidden');
@@ -157,6 +167,7 @@ class TrackContextMenu {
         this.container.style.top = `${topPos}px`;
         this.container.style.opacity = '1';
     }
+
     hide() {
         this.container.classList.add('hidden');
     }
@@ -164,6 +175,7 @@ class TrackContextMenu {
 
 
 class EditTrackModal {
+
     constructor() {
         this.id = 'edit-modal-overlay';
         this.container = document.getElementById(this.id);
@@ -181,6 +193,7 @@ class EditTrackModal {
         this.initSaveBtn();
         this.initCancelBtn();
     }
+
     show() {
         this.fieldsToEdit.forEach(field => {
             const input = document.getElementById(`edit-${field}`);
@@ -203,9 +216,11 @@ class EditTrackModal {
         compBox.dataset.originalState = allSameComp ? (firstComp === 1).toString() : "mixed";
         this.container.classList.remove('hidden');
     }
+
     hide() {
         this.container.classList.add('hidden');
     }
+
     initSaveBtn() {
         const saveBtn = document.getElementById('btn-save-edit');
         saveBtn.addEventListener('click', async () => {
@@ -249,16 +264,19 @@ class EditTrackModal {
             saveBtn.disabled = false;
         });
     }
+
     initCancelBtn() {
         const cancelBtn = document.getElementById('btn-cancel-edit');
         cancelBtn.addEventListener('click', () => {
             this.container.classList.add('hidden');
         });
     }
+
 }
 
 
 class ErrorMessageModal {
+
     constructor(title, message) {
         this.id = 'error-modal';
         this.container = document.getElementById(id);
@@ -266,30 +284,37 @@ class ErrorMessageModal {
         this.injectMessage(message);
         this.addEventListeners();
     }
+
     injectTitle(title) {
         const titleElement = document.getElementById('error-modal-title');
         titleElement.innerHTML = title;
     }
+
     injectMessage(message) {
         const messageElement = document.getElementById('error-modal-message');
         messageElement.innerHTML = message;
     }
+
     addEventListeners() {
         const errorModalOkBtn = document.getElementById('error-modal-ok-btn');
         errorModalOkBtn.addEventListener('click', () => {
             this.container.classList.add('hidden');
         });
     }
+
     show() {
         this.container.classList.remove('hidden');
     }
+
     static get containerId() {
         return this.id;
     }
+
 }
 
 
 class ViewSettingsModal {
+
     constructor() {
         this.id = 'grid-settings-modal';
         this.container = document.getElementById(this.id);
@@ -298,6 +323,7 @@ class ViewSettingsModal {
         this.cancelBtn = document.getElementById('btn-cancel-grid-settings');
         this.cancelBtn.addEventListener('click', () => {this.cancel();});
     }
+
     open() {
         document.querySelector(`input[name="grid-sort"][value="${albumsView.gridSortOrder}"]`).checked = true;
         document.querySelector(`input[name="grid-sort-dir"][value="${albumsView.gridSortDirection}"]`).checked = true;
@@ -305,6 +331,7 @@ class ViewSettingsModal {
         document.getElementById('grid-sticky-subheadings').checked = albumsView.stickyGridSubheadings;
         this.container.classList.remove('hidden');
     }
+
     save() {
         albumsView.gridSortOrder = document.querySelector('input[name="grid-sort"]:checked').value;
         albumsView.gridSortDirection = document.querySelector('input[name="grid-sort-dir"]:checked').value;
@@ -313,15 +340,19 @@ class ViewSettingsModal {
         albumsView.renderAlbumGrid(); 
         this.close();
     }
+
     cancel() {
         this.close();
     }
+
     close() {
         this.container.classList.add('hidden');
     }
+
     static get containerId() {
         return this.id;
     }
+
 }
 
 
@@ -353,14 +384,14 @@ class AppSettingsModal {
         });
     }
     applyAudioOptions() {
-        if (isNormalized) {
-            audioSource.disconnect(audioCtx.destination);
-            audioSource.connect(compressor);
-            compressor.connect(audioCtx.destination);
+        if (myAudioPlayer.isNormalized) {
+            myAudioPlayer.audioSource.disconnect(myAudioPlayer.audioCtx.destination);
+            myAudioPlayer.audioSource.connect(myAudioPlayer.compressor);
+            myAudioPlayer.compressor.connect(myAudioPlayer.audioCtx.destination);
         } else {
-            audioSource.disconnect(compressor);
-            compressor.disconnect(audioCtx.destination);
-            audioSource.connect(audioCtx.destination);
+            myAudioPlayer.audioSource.disconnect(myAudioPlayer.compressor);
+            myAudioPlayer.compressor.disconnect(myAudioPlayer.audioCtx.destination);
+            myAudioPlayer.audioSource.connect(myAudioPlayer.audioCtx.destination);
         }
     }
     applyVisualOptions() {
@@ -388,7 +419,7 @@ class AppSettingsModal {
     }
     show() {
         this.container.classList.remove('hidden');
-        this.audio_normalization_checkbox.checked = isNormalized;
+        this.audio_normalization_checkbox.checked = myAudioPlayer.isNormalized;
         this.dimmed_coverart_checkbox.checked = dimmedCoverArt;
         if (this.selectDropdown) {
             this.selectDropdown.value = savedAccent;
@@ -396,9 +427,9 @@ class AppSettingsModal {
 
     }
     save() {
-        initWebAudio();
-        if (isNormalized != this.audio_normalization_checkbox.checked) {
-            isNormalized = this.audio_normalization_checkbox.checked;
+        myAudioPlayer.initWebAudio();
+        if (myAudioPlayer.isNormalized != this.audio_normalization_checkbox.checked) {
+            myAudioPlayer.isNormalized = this.audio_normalization_checkbox.checked;
             this.applyAudioOptions();
         }
         if (dimmedCoverArt != this.dimmed_coverart_checkbox.checked) {
@@ -531,7 +562,7 @@ class GuiController {
                 } else {
                     albumsView.renderAlbumGrid(); 
                 }
-                refreshDynamicQueue();
+                myAudioPlayer.refreshDynamicQueue();
             }, SEARCH_DEBOUNCE_TIME); 
         });
         document.addEventListener('keydown', e => {
@@ -560,17 +591,17 @@ class GuiController {
     initPlayPauseBtn() {
         playPauseBtnPlayingIcon.style.display = 'none';
         gui.playPauseBtn.addEventListener('click', () => {
-            if (!audioPlayer.src) return;
-            if (isPlaying) {
-                audioPlayer.pause();
+            if (!myAudioPlayer.htmlAudioElement.src) return;
+            if (myAudioPlayer.isPlaying) {
+                myAudioPlayer.htmlAudioElement.pause();
                 playPauseBtnPlayingIcon.style.display = 'none';
                 playPauseBtnPausedIcon.style.display = 'block';
             } else {
-                audioPlayer.play();
+                myAudioPlayer.htmlAudioElement.play();
                 playPauseBtnPausedIcon.style.display = 'none';
                 playPauseBtnPlayingIcon.style.display = 'block';
             }
-            isPlaying = !isPlaying;
+            myAudioPlayer.isPlaying = !myAudioPlayer.isPlaying;
         });
         document.addEventListener('keydown', e => {
             if (e.code === 'Space') {
@@ -586,15 +617,15 @@ class GuiController {
     }
     initShuffleBtn() {
         gui.shuffleBtn.addEventListener('click', (e) => {
-            isShuffle = !isShuffle;
-            e.target.classList.toggle('active', isShuffle);
+            myAudioPlayer.isShuffle = !myAudioPlayer.isShuffle;
+            e.target.classList.toggle('active', myAudioPlayer.isShuffle);
             if (currentTrackIndex !== -1) {
-                buildContextQueue(currentTrackIndex);
+                myAudioPlayer.buildContextQueue(currentTrackIndex);
                 if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
                     queuePopover.render();
                 }
             }
-            if (isShuffle) {
+            if (myAudioPlayer.isShuffle) {
                 document.getElementById('shuffle-btn').innerHTML =
                 '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                 '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm480-120h160q17 0 28.5-11.5T800-200v-160q0-17-11.5-28.5T760-400q-17 0-28.5 11.5T720-360v62l-97-97q-12-12-28.5-12T566-395q-12 12-12.5 28t11.5 28l99 99h-64q-17 0-28.5 11.5T560-200q0 17 11.5 28.5T600-160Zm-428-12q11 11 28 11t28-11l492-492v64q0 17 11.5 28.5T760-560q17 0 28.5-11.5T800-600v-160q0-17-11.5-28.5T760-800H600q-17 0-28.5 11.5T560-760q0 17 11.5 28.5T600-720h64L172-228q-11 11-11 28t11 28Zm-1-560 168 167q11 11 28 11t28-11q12-12 11.5-28.5T395-621L227-788q-12-11-28.5-11T171-788q-11 11-11 28t11 28Z"/>' +
@@ -609,10 +640,11 @@ class GuiController {
             }
         });
     }
+
     initRepeatBtn() {
         gui.repeatBtn.addEventListener('click', () => {
-            if (repeatMode === 'off') {
-                repeatMode = 'all';
+            if (myAudioPlayer.repeatMode === 'off') {
+                myAudioPlayer.repeatMode = 'all';
                 gui.repeatBtn.classList.add('active');
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
@@ -620,8 +652,8 @@ class GuiController {
                     '</svg>'
                 ;
                 gui.repeatBtn.title = 'Repeat: All';
-            } else if (repeatMode === 'all') {
-                repeatMode = 'one';
+            } else if (myAudioPlayer.repeatMode === 'all') {
+                repeatmyAudioPlayer.repeatModeMode = 'one';
                 gui.repeatBtn.classList.add('active');
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
@@ -630,7 +662,7 @@ class GuiController {
                 ;
                 gui.repeatBtn.title = 'Repeat: One';
             } else {
-                repeatMode = 'off';
+                myAudioPlayer.repeatMode = 'off';
                 gui.repeatBtn.classList.remove('active');
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
@@ -641,6 +673,7 @@ class GuiController {
             }
         });
     }
+
     initQueueBtn() {
         gui.queueBtn.addEventListener('mousedown', (e) => {
             gui.applicationMenu.sethidden = true;
@@ -656,28 +689,31 @@ class GuiController {
             }
         });
     }
+
     initNextBtn() {
         gui.nextBtn.addEventListener('click', async () => {
-            const targetPath = popNextTrackFromQueue();
-            if (targetPath) await requestPlayback(targetPath, 1, false);
+            const targetPath = myAudioPlayer.popNextTrackFromQueue();
+            if (targetPath) await myAudioPlayer.requestPlayback(targetPath, 1, false);
         });
     }
+
     initPrevBtn() {
         gui.prevBtn.addEventListener('click', async () => {
             if (!currentPlayingPath) return;
-            if (audioPlayer.currentTime > SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
-                audioPlayer.currentTime = 0;
-                gui.progressBar.value = audioPlayer.currentTime;
+            if (myAudioPlayer.htmlAudioElement.currentTime > SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
+                myAudioPlayer.htmlAudioElement.currentTime = 0;
+                gui.progressBar.value = myAudioPlayer.htmlAudioElement.currentTime;
             } else {
-                const targetPath = getPreviousTrackPath(currentPlayingPath);
+                const targetPath = myAudioPlayer.getPreviousTrackPath(currentPlayingPath);
                 if (targetPath) {
-                    manualQueue = [];
-                    buildContextQueue(targetPath);
-                    await requestPlayback(targetPath, -1, false);
+                    myAudioPlayer.manualQueue = [];
+                    myAudioPlayer.buildContextQueue(targetPath);
+                    await myAudioPlayer.requestPlayback(targetPath, -1, false);
                 }
             }
         });
     }
+
     initProgressBar() {
         gui.currentTimeEl.style.visibility = 'hidden';
         gui.totalTimeEl.style.visibility = 'hidden';
@@ -687,19 +723,20 @@ class GuiController {
             gui.currentTimeEl.innerText = Utils.formatTime(gui.progressBar.value);
         });
         gui.progressBar.addEventListener('change', (e) => {
-            audioPlayer.currentTime = gui.progressBar.value;
+            myAudioPlayer.htmlAudioElement.currentTime = gui.progressBar.value;
             this.isUserDraggingProgressHandle = false;
         });
-        audioPlayer.addEventListener('timeupdate', () => {
+        myAudioPlayer.htmlAudioElement.addEventListener('timeupdate', () => {
             if (this.isUserDraggingProgressHandle) return; 
-            gui.currentTimeEl.innerText = Utils.formatTime(audioPlayer.currentTime);
-            if (audioPlayer.duration) {
-                gui.totalTimeEl.innerText = Utils.formatTime(audioPlayer.duration);
-                gui.progressBar.max = audioPlayer.duration;
-                gui.progressBar.value = audioPlayer.currentTime;
+            gui.currentTimeEl.innerText = Utils.formatTime(myAudioPlayer.htmlAudioElement.currentTime);
+            if (myAudioPlayer.htmlAudioElement.duration) {
+                gui.totalTimeEl.innerText = Utils.formatTime(myAudioPlayer.htmlAudioElement.duration);
+                gui.progressBar.max = myAudioPlayer.htmlAudioElement.duration;
+                gui.progressBar.value = myAudioPlayer.htmlAudioElement.currentTime;
             }
         });
     }
+
     initAddMusicBtn() {
         if (gui.addMusicBtn) {
             gui.addMusicBtn.addEventListener('click', async () => {
@@ -707,12 +744,13 @@ class GuiController {
             });
         }
     }
+
     initVolumeBtn() {
         if (gui.volumeBtn) {
             this.setVolumeIcon();
             gui.volumeBtn.addEventListener('click', () =>  {
-                audioPlayer.muted = !audioPlayer.muted;
-                if (audioPlayer.muted) {
+                myAudioPlayer.htmlAudioElement.muted = !myAudioPlayer.htmlAudioElement.muted;
+                if (myAudioPlayer.htmlAudioElement.muted) {
                     gui.volumeBar.value = gui.volumeBar.min;
                 } else {
                     gui.volumeBar.value = GuiHelper.volumeToSlider(
@@ -722,6 +760,7 @@ class GuiController {
             });
         }
     }
+
     initVolumebar() {
         if (gui.volumeBar) {
             gui.volumeBar.min = 0;
@@ -729,16 +768,17 @@ class GuiController {
             gui.volumeBar.step = gui.volumeBar.max / 100;
             gui.volumeBar.value = myAudioPlayer.getVolumeLevel();
             gui.volumeBar.addEventListener('input', () => {
-                if (audioPlayer.muted) audioPlayer.muted = false;
+                if (myAudioPlayer.htmlAudioElement.muted) myAudioPlayer.htmlAudioElement.muted = false;
                 myAudioPlayer.setVolumeLevel(
                     GuiHelper.sliderToVolume(gui.volumeBar.value));
-                audioPlayer.volume = myAudioPlayer.getVolumeLevel();
+                myAudioPlayer.htmlAudioElement.volume = myAudioPlayer.getVolumeLevel();
                 this.setVolumeIcon();
             });
         }
     }
+
     setVolumeIcon() {
-        if (audioPlayer.muted) {
+        if (myAudioPlayer.htmlAudioElement.muted) {
             this.speakerIcon.style.display = 'none';
             this.mutedIcon.style.display = 'initial';
         } else {
@@ -746,6 +786,7 @@ class GuiController {
             this.speakerIcon.style.display = 'initial';
         }
     }
+
     renderDefaultView() {
         songsView.renderVirtualList(); 
     }
@@ -865,6 +906,15 @@ class SongsView {
         }
         this.renderVirtualList();
     }
+    async doubleClickOnTrack(e) {
+        const row = e.target.closest('li');
+        if (!row) return;
+        const trackIndex = parseInt(row.dataset.index);
+        const targetPath = musicLibrary.data[trackIndex].file_path;
+        window.getSelection().removeAllRanges();
+        myAudioPlayer.playbackContext = { type: 'list', key: null };    
+        await myAudioPlayer.requestPlayback(targetPath, 1, true);
+    }
     addEventListeners() {
         this.trackListContainer.addEventListener('scroll', () => {
             window.requestAnimationFrame(() => {
@@ -879,7 +929,7 @@ class SongsView {
                     doubleClickOnTrackPossible = false;
                 }, doubleClickDelay);
             } else {
-                doubleClickOnTrack(e);
+                this.doubleClickOnTrack(e);
             }
         });
         this.trackList.addEventListener('contextmenu', (e) => {
@@ -1168,11 +1218,11 @@ class AlbumsView {
                 );
             } else {
                 window.getSelection().removeAllRanges(); 
-                playbackContext = { type: 'album', key: albumData.key };
-                staticAlbumPool = albumData.tracks.map(
+                myAudioPlayer.playbackContext = { type: 'album', key: albumData.key };
+                musicLibrary.staticAlbumPool = albumData.tracks.map(
                     t => t.file_path
                 );
-                requestPlayback(li.dataset.filepath, 1, true);
+                myAudioPlayer.requestPlayback(li.dataset.filepath, 1, true);
             }    
         });
         expandedList.addEventListener('contextmenu', (e) => {
@@ -1238,11 +1288,14 @@ class Utils {
 
 
 class MusicLibrary {
+
     constructor() {
         this.masterLibraryData = []; 
-        this.libraryData = [];    
+        this.libraryData = [];
+        this.staticAlbumPool = []; // Locks in the grid view context so it ignores filters  
         this.fetchLibraryData();
     }
+
     fetchLibraryData() {
         window.addEventListener('pywebviewready', async () => {
             try {
@@ -1257,6 +1310,7 @@ class MusicLibrary {
             }
         });
     }
+
     async importFiles() {
         const response = await window.pywebview.api.add_files_to_db();
         if (response.status === 'started') {
@@ -1289,18 +1343,20 @@ class MusicLibrary {
             alert("An import is already running in the background.");
         }
     }
-    set masterData(masterData) {
-        this.masterLibraryData = masterData;
+
+    getPoolOfAllowedTracks() {
+        if (myAudioPlayer.playbackContext.type === 'album') {
+            return this.staticAlbumPool;
+        } else {
+            return this.libraryData.map(t => t.file_path);
+        }
     }
-    get masterData() {
-        return this.masterLibraryData;
-    }
-    set data(data) {
-        this.libraryData = data;
-    }
-    get data() {
-        return this.libraryData;
-    }
+
+    set masterData(masterData) { this.masterLibraryData = masterData; }
+    get masterData() { return this.masterLibraryData; }
+    set data(data) { this.libraryData = data; }
+    get data() { return this.libraryData; }
+
 }
 
 
@@ -1433,8 +1489,8 @@ class QueuePopover {
         const clearQueueBtn = document.getElementById('clear-queue-btn');
         clearQueueBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            manualQueue = [];
-            contextQueue = [];
+            myAudioPlayer.manualQueue = [];
+            myAudioPlayer.contextQueue = [];
             this.render();
         });
     }
@@ -1442,7 +1498,7 @@ class QueuePopover {
     render() {
         console.log('popup is being rendered...');
         this.queueList.innerHTML = '';   
-        const combinedQueue = manualQueue.concat(contextQueue); 
+        const combinedQueue = myAudioPlayer.manualQueue.concat(myAudioPlayer.contextQueue); 
         this.visuallyCombineQueues(combinedQueue);
         this.initRemovalButtons();
         this.updateFooterText(combinedQueue);
@@ -1459,9 +1515,9 @@ class QueuePopover {
             const track = musicLibrary.masterData.find(t => t.file_path === trackPath);
             if (!track) return;
             const li = document.createElement('li');
-            const isManual = visualIndex < manualQueue.length;
+            const isManual = visualIndex < myAudioPlayer.manualQueue.length;
             const sourceArray = isManual ? 'manual' : 'context';
-            const sourceIndex = isManual ? visualIndex : visualIndex - manualQueue.length;
+            const sourceIndex = isManual ? visualIndex : visualIndex - myAudioPlayer.manualQueue.length;
             li.innerHTML = `
                 <img src="${GuiHelper.getCoverUrl(track.cover_hash)}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
                 <div class="queue-item-info">
@@ -1495,9 +1551,9 @@ class QueuePopover {
                 const src = btn.dataset.source;
                 const idx = parseInt(btn.dataset.index);
                 if (src === 'manual') {
-                    manualQueue.splice(idx, 1);
+                    myAudioPlayer.manualQueue.splice(idx, 1);
                 } else {
-                    contextQueue.splice(idx, 1);
+                    myAudioPlayer.contextQueue.splice(idx, 1);
                 }
                 this.render();
             });
@@ -1507,249 +1563,222 @@ class QueuePopover {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-let playbackContext = { type: 'list', key: null }; // Tracks 'list' or 'album' context
-let manualQueue = [];  // NEW: Tracks manually added by user
-let contextQueue = []; // NEW: Tracks automatically generated by the album/list
-let staticAlbumPool = []; // Locks in the grid view context so it ignores filters
-
-// ------------------------- PATH-BASED ARCHITECTURE
-
-function getPoolOfAllowedTracks() {
-    if (playbackContext.type === 'album') {
-        return staticAlbumPool;
-    } else {
-        return musicLibrary.data.map(t => t.file_path);
-    }
-}
-
-function buildContextQueue(startPath) { // returns queue array
-    let pool = getPoolOfAllowedTracks();
-    let poolIndex = pool.indexOf(startPath);
-    if (poolIndex === -1) {
-        contextQueue = []; 
-    }
-    let remaining = pool.slice(poolIndex + 1);
-    if (isShuffle) {
-        for (let i = remaining.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-        }
-    }
-    contextQueue = remaining;
-}
-
-function popNextTrackFromQueue() {
-    while (manualQueue.length > 0) {
-        const nextPath = manualQueue.shift();
-        if (musicLibrary.masterData.find(
-            t => t.file_path === nextPath && !t.missing
-        )) return nextPath;
-    }
-    while (contextQueue.length > 0) {
-        const nextPath = contextQueue.shift();
-        if (musicLibrary.masterData.find(
-            t => t.file_path === nextPath && !t.missing
-        )) return nextPath;
-    }
-    if (repeatMode === 'all') {
-        let pool = getPoolOfAllowedTracks();
-        if (pool.length > 0) {
-            let firstPath = pool[0];
-            if (isShuffle) {
-                let shuffled = [...pool];
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                }
-                firstPath = shuffled.shift();
-                contextQueue = shuffled;
-            } else {
-                contextQueue = pool.slice(1);
-            }
-            if (masterLibraryData.find(t => t.file_path === firstPath && !t.missing)) return firstPath;
-            return firstPath; // If missing, requestPlayback's bouncer will handle it naturally
-        }
-    }
-    return null;
-}
-
-function getPreviousTrackPath(startPath) {
-    let pool = getPoolOfAllowedTracks();
-    let poolIndex = pool.indexOf(startPath);
-    if (pool <= 0) {
-        if (repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
-        return null;
-    }
-    return pool[poolIndex - 1];
-}
-
-function refreshDynamicQueue() {
-    console.log('refreshDynamic Queue...')
-    if (playbackContext.type === 'list' && currentPlayingPath) {
-        buildContextQueue(currentPlayingPath);
-        console.log('context queue has just been built');
-        if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
-            queuePopover.render();
-            console.log('popover render method being fired')
-        }
-    }
-}
-
-
-// --------------------------------------- AUDIO PLAYER
-
-const audioPlayer = new Audio();
-audioPlayer.crossOrigin = "anonymous";
-
-let audioCtx;
-let audioSource;
-let compressor;
-let isNormalized = true;
-let isPlaying = false;
-let isShuffle = false;
-let repeatMode = 'off';
-
-function initWebAudio() {
-    if (audioCtx) return; 
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioSource = audioCtx.createMediaElementSource(audioPlayer);
-    compressor = new DynamicsCompressorNode(audioCtx, {
-        threshold: -50,
-        knee: 40,
-        ratio: 12,
-        attack: 0,
-        release: 0.25,
-    });
-    if (isNormalized) {
-        audioSource.connect(compressor);
-        compressor.connect(audioCtx.destination);
-    } else {
-        audioSource.connect(audioCtx.destination);
-    }
-
-}
-
 class MyAudioPlayer {
 
     constructor () {
+        this.htmlAudioElement;
+        this.audioCtx;
+        this.audioSource;
+        this.compressor;
         this.volumeMin = 0.01
         this.volumeMax = 1;
         this.volumeLevel = this.volumeMax;
+        this.isNormalized = true;
+        this.isPlaying = false;
+        this.isShuffle = false;
+        this.repeatMode = 'off';
+        this.playbackContext = { type: 'list', key: null }; // Tracks 'list' or 'album' context
+        this.manualQueue = [];  // NEW: Tracks manually added by user
+        this.contextQueue = []; // NEW: Tracks automatically generated by the album/list
+        this.initHtmlAudio();
     }
 
     getVolumeLevel() {return this.volumeLevel;}
     getVolumeMax() {return this.volumeMax;}
     getVolumeMin() {return this.volumeMin;}
-    
     setVolumeLevel(value) {this.volumeLevel = value;}
 
-}
-
-const myAudioPlayer = new MyAudioPlayer();
-
-async function doubleClickOnTrack(e) {
-    const row = e.target.closest('li');
-    if (!row) return;
-    const trackIndex = parseInt(row.dataset.index);
-    const targetPath = musicLibrary.data[trackIndex].file_path;
-    window.getSelection().removeAllRanges();
-    playbackContext = { type: 'list', key: null };    
-    await requestPlayback(targetPath, 1, true);
-}
-
-
-function playTrack(track) {
-    currentPlayingPath = track.file_path;
-    songsView.renderVirtualList();
-    const expandedList = document.getElementById('expanded-track-list');
-    if (expandedList) {
-        Array.from(expandedList.children).forEach(li => {
-            if (li.dataset.filepath === currentPlayingPath) li.classList.add('track-playing');
-            else li.classList.remove('track-playing');
+    initHtmlAudio() {
+        this.htmlAudioElement = new Audio();
+        this.htmlAudioElement.crossOrigin = "anonymous";
+        this.htmlAudioElement.addEventListener('ended', async () => {
+            if (this.repeatMode === 'one') {
+                this.htmlAudioElement.currentTime = 0;
+                this.htmlAudioElement.play();
+                return;
+            }
+            const targetPath = this.popNextTrackFromQueue();
+            if (targetPath) {
+                await this.requestPlayback(targetPath, 1, false);
+            } else {
+                this.isPlaying = false;
+                playPauseBtnPausedIcon.style.display = 'block';
+                playPauseBtnPlayingIcon.style.display = "none";
+                gui.currentTimeEl.style.visibility = 'hidden';
+                gui.totalTimeEl.style.visibility = 'hidden';
+                gui.progressBar.disabled = true;
+                this.htmlAudioElement.currentTime = 0;
+            }
         });
     }
-    if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
-        queuePopover.render();
+
+    initWebAudio() {
+        if (this.audioCtx) return; 
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.audioSource = audioCtx.createMediaElementSource(this.htmlAudioElement);
+        this.compressor = new DynamicsCompressorNode(this.audioCtx, {
+            threshold: -50,
+            knee: 40,
+            ratio: 12,
+            attack: 0,
+            release: 0.25,
+        });
+        if (this.isNormalized) {
+            this.audioSource.connect(this.compressor);
+            this.compressor.connect(this.audioCtx.destination);
+        } else {
+            this.audioSource.connect(this.audioCtx.destination);
+        }
     }
-    initWebAudio(); 
-    const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
-    audioPlayer.src = safePath;
-    audioPlayer.play();
-    isPlaying = true;
-    playPauseBtnPlayingIcon.style.display = 'block';
-    playPauseBtnPausedIcon.style.display = 'none';
-    gui.currentTimeEl.style.visibility = 'initial';
-    gui.totalTimeEl.style.visibility = 'initial';
-    gui.progressBar.disabled = false;
-    document.getElementById('np-title').innerText = track.title;
-    document.getElementById('np-artist').innerText = track.artist;
-    document.getElementById('np-cover').src = GuiHelper.getCoverUrl(track.cover_hash);
+
+    async requestPlayback(targetPath, direction = 1, isManualClick = false) {
+        if (musicLibrary.data.length === 0 || !targetPath) return;
+        const track = musicLibrary.masterData.find(t => t.file_path === targetPath);
+        if (!track) return;
+        const exists = await window.pywebview.api.check_file_exists(track.file_path);
+        if (!exists) {
+            track.missing = true;
+            songsView.renderVirtualList();
+            if (isManualClick) {
+                if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
+                    const response = await window.pywebview.api.locate_missing_file(track.file_path);
+                    if (response.status === 'success') {
+                        const newPath = response.new_path;
+                        const replacePath = (arr) => arr.map(p => p === targetPath ? newPath : p);
+                        this.manualQueue = replacePath(this.manualQueue);
+                        myAudioPlayer.contextQueue = replacePath(myAudioPlayer.contextQueue);
+                        musicLibrary.staticAlbumPool = replacePath(musicLibrary.staticAlbumPool);
+                        track.file_path = newPath;
+                        track.missing = false;
+                        songsView.renderVirtualList(); 
+                        this.requestPlayback(newPath, direction, isManualClick);
+                    }
+                }
+            } else {
+                console.warn(`Skipping missing track: ${track.title}`);
+                const nextValidPath = direction === 1 ? this.FromQueue() : this.getPreviousTrackPath(targetPath);
+                if (nextValidPath && nextValidPath !== targetPath) {
+                    this.requestPlayback(nextValidPath, direction, false);
+                }
+            }
+            return; 
+        }
+        if (isManualClick) {
+            this.manualQueue = [];
+            this.buildContextQueue(targetPath);
+        }
+        this.playTrack(track);
+    }
+
+    playTrack(track) {
+        currentPlayingPath = track.file_path;
+        songsView.renderVirtualList();
+        const expandedList = document.getElementById('expanded-track-list');
+        if (expandedList) {
+            Array.from(expandedList.children).forEach(li => {
+                if (li.dataset.filepath === currentPlayingPath) li.classList.add('track-playing');
+                else li.classList.remove('track-playing');
+            });
+        }
+        if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+            queuePopover.render();
+        }
+        this.initWebAudio(); 
+        const safePath = `http://127.0.0.1:65432/?file=${encodeURIComponent(track.file_path)}`;
+        this.htmlAudioElement.src = safePath;
+        this.htmlAudioElement.play();
+        this.isPlaying = true;
+        playPauseBtnPlayingIcon.style.display = 'block';
+        playPauseBtnPausedIcon.style.display = 'none';
+        gui.currentTimeEl.style.visibility = 'initial';
+        gui.totalTimeEl.style.visibility = 'initial';
+        gui.progressBar.disabled = false;
+        document.getElementById('np-title').innerText = track.title;
+        document.getElementById('np-artist').innerText = track.artist;
+        document.getElementById('np-cover').src = GuiHelper.getCoverUrl(track.cover_hash);
+    }
+
+    buildContextQueue(startPath) { // returns queue array
+        let pool = musicLibrary.getPoolOfAllowedTracks();
+        let poolIndex = pool.indexOf(startPath);
+        if (poolIndex === -1) {
+            this.contextQueue = []; 
+        }
+        let remaining = pool.slice(poolIndex + 1);
+        if (this.isShuffle) {
+            for (let i = remaining.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+            }
+        }
+        this.contextQueue = remaining;
+    }
+    
+    popNextTrackFromQueue() {
+        while (this.manualQueue.length > 0) {
+            const nextPath = this.manualQueue.shift();
+            if (musicLibrary.masterData.find(
+                t => t.file_path === nextPath && !t.missing
+            )) return nextPath;
+        }
+        while (this.contextQueue.length > 0) {
+            const nextPath = this.contextQueue.shift();
+            if (musicLibrary.masterData.find(
+                t => t.file_path === nextPath && !t.missing
+            )) return nextPath;
+        }
+        if (this.repeatMode === 'all') {
+            let pool = musicLibrary.getPoolOfAllowedTracks();
+            if (pool.length > 0) {
+                let firstPath = pool[0];
+                if (this.isShuffle) {
+                    let shuffled = [...pool];
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+                    firstPath = shuffled.shift();
+                    this.contextQueue = shuffled;
+                } else {
+                    this.contextQueue = pool.slice(1);
+                }
+                if (masterLibraryData.find(t => t.file_path === firstPath && !t.missing)) return firstPath;
+                return firstPath; // If missing, requestPlayback's bouncer will handle it naturally
+            }
+        }
+        return null;
+    }
+    
+    getPreviousTrackPath(startPath) {
+        let pool = musicLibrary.getPoolOfAllowedTracks();
+        let poolIndex = pool.indexOf(startPath);
+        if (pool <= 0) {
+            if (myAudioPlayer.repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
+            return null;
+        }
+        return pool[poolIndex - 1];
+    }
+    
+    refreshDynamicQueue() {
+        if (this.playbackContext.type === 'list' && currentPlayingPath) {
+            this.buildContextQueue(currentPlayingPath);
+            console.log('context queue has just been built');
+            if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+                queuePopover.render();
+            }
+        }
+    }
+
 }
 
-audioPlayer.addEventListener('ended', async () => {
-    if (repeatMode === 'one') {
-        audioPlayer.currentTime = 0;
-        audioPlayer.play();
-        return;
-    }
-    const targetPath = popNextTrackFromQueue();
-    if (targetPath) {
-        await requestPlayback(targetPath, 1, false);
-    } else {
-        isPlaying = false;
-        playPauseBtnPausedIcon.style.display = 'block';
-        playPauseBtnPlayingIcon.style.display = "none";
-        gui.currentTimeEl.style.visibility = 'hidden';
-        gui.totalTimeEl.style.visibility = 'hidden';
-        gui.progressBar.disabled = true;
-        audioPlayer.currentTime = 0;
-    }
-});
+
+
+
+
+
+
+
+
 
 
 
@@ -1773,58 +1802,14 @@ function sortLibrary(field) {
         return 0;
     });
     songsView.renderVirtualList();
-    refreshDynamicQueue();
+    myAudioPlayer.refreshDynamicQueue();
 }
 
 document.querySelectorAll('.col-sortable').forEach(header => {
     header.addEventListener('click', () => { sortLibrary(header.dataset.sort); });
 });
 
-async function requestPlayback(targetPath, direction = 1, isManualClick = false) {
-    if (musicLibrary.data.length === 0 || !targetPath) return;
-    const track = musicLibrary.masterData.find(t => t.file_path === targetPath);
-    if (!track) return;
 
-    const exists = await window.pywebview.api.check_file_exists(track.file_path);
-    if (!exists) {
-        track.missing = true;
-        songsView.renderVirtualList();
-        if (isManualClick) {
-            if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
-                const response = await window.pywebview.api.locate_missing_file(track.file_path);
-                if (response.status === 'success') {
-                    const newPath = response.new_path;
-                    const replacePath = (arr) => arr.map(p => p === targetPath ? newPath : p);
-                    manualQueue = replacePath(manualQueue);
-                    contextQueue = replacePath(contextQueue);
-                    staticAlbumPool = replacePath(staticAlbumPool);
-                    track.file_path = newPath;
-                    track.missing = false;
-                    songsView.renderVirtualList(); 
-                    requestPlayback(newPath, direction, isManualClick);
-                }
-            }
-        } else {
-            console.warn(`Skipping missing track: ${track.title}`);
-            const nextValidPath = direction === 1 ? popNextTrackFromQueue() : getPreviousTrackPath(targetPath);
-            if (nextValidPath && nextValidPath !== targetPath) {
-                requestPlayback(nextValidPath, direction, false);
-            }
-        }
-        return; 
-    }
-    if (isManualClick) {
-        manualQueue = [];
-        buildContextQueue(targetPath);
-        console.log('targetPath: ' + targetPath);
-        console.log('contextQueue (0-9): ');
-        contextQueue.slice(0, 9).forEach(t => {
-            console.log(t);
-        });
-    }
-
-    playTrack(track);
-}
 
 
 
@@ -1919,7 +1904,7 @@ forceKeyboardFocusRelease();
 
 
 
-
+const myAudioPlayer = new MyAudioPlayer();
 const gui = new Gui();
 const guiController = new GuiController();
 const musicLibrary = new MusicLibrary();
