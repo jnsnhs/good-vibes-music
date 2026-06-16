@@ -263,7 +263,7 @@
 
     <div id="grid-settings-modal" class="hidden">
       <div class="modal-content" style="width: 350px">
-        <h2>Album Grid Settings</h2>
+        <h2>Albums View Settings</h2>
 
         <div style="margin-bottom: 20px">
           <label
@@ -357,6 +357,42 @@
             Cancel
           </button>
           <button id="btn-save-grid-settings" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="list-settings-modal" class="hidden">
+      <div class="modal-content" style="width: 350px">
+        <h2>Song View Settings</h2>
+        <div style="margin-bottom: 20px">
+          <label
+            style="
+              font-size: 11px;
+              color: var(--text-secondary);
+              text-transform: uppercase;
+            "
+            >Display Options</label
+          >
+          <div style="margin-top: 8px">
+            <label
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              "
+            >
+              <input type="checkbox" id="list-show-coverart" /> Show cover art
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-cancel-list-settings" class="secondary-btn">
+            Cancel
+          </button>
+          <button id="btn-save-list-settings" class="primary-btn">Save</button>
         </div>
       </div>
     </div>

@@ -1,28 +1,10 @@
-let currentTrackIndex = -1; 
-let selectedPaths = new Set(); 
-let lastClickedIndex = null;
-let lastGridClickedIndex = null;
-let currentPlayingPath = null;
-
+const DOUBLE_CLICK_DELAY = 200;
 const SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
 const SEARCH_DEBOUNCE_TIME = 300;
 let dimmedCoverArt = true;
 let savedAccent = 'blue';
 
-const doubleClickDelay = 200;
-let doubleClickOnTrackPossible = false;
-
-let trackBeingEdited = null;
-
-let currentSort = { field: null, ascending: true };
-
-let searchDebounceTimeout;
-
-const playPauseBtnPausedIcon = document.getElementById('play-pause-btn-paused');
-const playPauseBtnPlayingIcon = document.getElementById('play-pause-btn-playing');
-
-const COVER_PLACEHOLDER_PATH = 'placeholder.png';
-const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3b3b3'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>`;
+let selectedPaths = new Set();
 
 
 class ApplicationMenu {
@@ -138,11 +120,11 @@ class TrackContextMenu {
 
     initEditItem() {
         const editItem = document.getElementById('ctx-edit');
-        editItem.addEventListener('click', () => {
+        editItem.addEventListener('click', (e) => {
             const pathsArray = Array.from(selectedPaths);
             if (pathsArray.length === 0) return;
             gui.trackContextMenu.hide();
-            gui.trackContextMenu.show();
+            gui.editModal.show(pathsArray);
         });
     }
 
@@ -194,7 +176,7 @@ class EditTrackModal {
         this.initCancelBtn();
     }
 
-    show() {
+    show(pathsArray) {
         this.fieldsToEdit.forEach(field => {
             const input = document.getElementById(`edit-${field}`);
             const firstVal = musicLibrary.masterData.find(t => t.file_path === pathsArray[0])[field];
@@ -219,6 +201,7 @@ class EditTrackModal {
 
     hide() {
         this.container.classList.add('hidden');
+        guiController.clearSelection();
     }
 
     initSaveBtn() {
@@ -313,7 +296,7 @@ class ErrorMessageModal {
 }
 
 
-class ViewSettingsModal {
+class AlbumsViewSettingsModal {
 
     constructor() {
         this.id = 'grid-settings-modal';
@@ -338,6 +321,43 @@ class ViewSettingsModal {
         albumsView.showGridSubheadings = document.getElementById('grid-show-subheadings').checked;
         albumsView.stickyGridSubheadings = document.getElementById('grid-sticky-subheadings').checked;
         albumsView.renderAlbumGrid(); 
+        this.close();
+    }
+
+    cancel() {
+        this.close();
+    }
+
+    close() {
+        this.container.classList.add('hidden');
+    }
+
+    static get containerId() {
+        return this.id;
+    }
+
+}
+
+
+class SongsViewSettingsModal {
+
+    constructor() {
+        this.id = 'list-settings-modal';
+        this.container = document.getElementById(this.id);
+        this.saveBtn = document.getElementById('btn-save-list-settings');
+        this.saveBtn.addEventListener('click', () => {this.save();});
+        this.cancelBtn = document.getElementById('btn-cancel-list-settings');
+        this.cancelBtn.addEventListener('click', () => {this.cancel();});
+    }
+
+    open() {
+        document.getElementById('list-show-coverart').checked = songsView.showCoverArt;
+        this.container.classList.remove('hidden');
+    }
+
+    save() {
+        songsView.showCoverArt = document.getElementById('list-show-coverart').checked;
+        songsView.renderVirtualList(); 
         this.close();
     }
 
@@ -415,7 +435,6 @@ class AppSettingsModal {
     applyAccentTheme(colorName) {
         const hexValue = this.accentThemes[colorName] || this.accentThemes.green;
         document.documentElement.style.setProperty('--accent', hexValue);
-        // localStorage.setItem('selected-accent-theme', colorName);
     }
     show() {
         this.container.classList.remove('hidden');
@@ -449,14 +468,17 @@ class AppSettingsModal {
 
 
 class Gui {
+
     constructor() {
         this.currentView = 'list';  // list or grid
-
+        this.doubleClickOnTrackPossible = false;
+        this.COVER_PLACEHOLDER_PATH = 'placeholder.png';
+        this.playPauseBtnPausedIcon = document.getElementById('play-pause-btn-paused');
+        this.playPauseBtnPlayingIcon = document.getElementById('play-pause-btn-playing');
         this.songsViewBtn = document.getElementById('toggle-list-btn');
         this.albumsViewBtn = document.getElementById('toggle-grid-btn');
         this.searchField = document.getElementById('search-input');
         this.addMusicBtn = document.getElementById('add-music-btn');
-        
         this.appMenuBtn = document.getElementById('application-menu-btn');
         this.prevBtn = document.getElementById('prev-btn');
         this.playPauseBtn = document.getElementById('play-pause-btn');
@@ -469,19 +491,20 @@ class Gui {
         this.queueBtn = document.getElementById('queue-btn');
         this.volumeBtn = document.getElementById('volume-btn');
         this.volumeBar = document.getElementById('volume-bar');
-
         this.applicationMenu = new ApplicationMenu();
         this.appSettingsModal = new AppSettingsModal();
-
         this.trackContextMenu = new TrackContextMenu();
         this.editModal = new EditTrackModal();
     }
+
 }
 
 
 class GuiController {
+
     constructor() {
         this.isUserDraggingProgressHandle = false;
+        this.searchDebounceTimeout;
         document.addEventListener('DOMContentLoaded', () => {
             this.speakerIcon = document.getElementById("volume-icon-max");
             this.mutedIcon = document.getElementById("volume-icon-muted");
@@ -508,7 +531,64 @@ class GuiController {
                 gui.trackContextMenu.hide();
             }
         }, { capture: true });
+        this.suppressContextMenuGlobally();
+        this.forceKeyboardFocusRelease();
+        this.clearSelectionOnClick();
     }
+
+    suppressContextMenuGlobally() {
+        document.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            const isTrack = e.target.closest('li:not(.disc-header)');
+            const isCard = e.target.closest('.album-card');
+            const isInteractive = e.target.closest(
+                'button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover, #edit-modal-overlay, #grid-settings-modal, #application-menu');    
+            if (!isTrack && !isCard && !isInteractive) {
+                clearSelection();
+                gui.trackContextMenu.hide();
+            }
+        });
+    }
+
+    forceKeyboardFocusRelease() {
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('pointerup', () => {slider.blur();});
+        });
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('pointerup', () => {button.blur();});
+        });
+    }
+
+    clearSelectionOnClick() {
+        document.addEventListener('click', (e) => {
+            const isTrack = e.target.closest('li:not(.disc-header)');
+            const isCard = e.target.closest('.album-card');
+            const isInteractive = e.target.closest(
+                'button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover, #edit-modal-overlay, #grid-settings-modal, #application-menu');    
+            if (!isTrack && !isCard && !isInteractive) {
+                this.clearSelection();
+            }
+        });
+    }
+
+    clearSelection() { // visual and logical
+        if (selectedPaths.size > 0) {
+            selectedPaths.clear();
+            songsView.lastClickedIndex = null;
+            albumsView.lastGridClickedIndex = null;
+            if (gui.currentView === 'list') {
+                songsView.renderVirtualList();
+            } else { // currentView == 'grid'
+                const expandedList = document.getElementById('expanded-track-list');
+                if (expandedList) {
+                    Array.from(expandedList.children).forEach(child => {
+                        child.classList.remove('track-selected');
+                    });
+                }
+            }
+        }
+    }
+
     initSongsViewBtn() {
         gui.songsViewBtn.addEventListener('click', () => {
             gui.currentView = 'list';
@@ -519,6 +599,7 @@ class GuiController {
             songsView.renderVirtualList();
         });
     }
+
     initAlbumsViewBtn() {
         gui.albumsViewBtn.addEventListener('click', () => {
             gui.currentView = 'grid';
@@ -529,19 +610,27 @@ class GuiController {
             albumsView.renderAlbumGrid();
         });
     }
+
     initViewSettingsBtn() {
         const viewSettingsBtn = document.getElementById('view-settings-btn');
         if (viewSettingsBtn) {
             viewSettingsBtn.addEventListener('click', () => {
-                const viewSettingsModal = new ViewSettingsModal();
-                viewSettingsModal.open();
+                if (gui.currentView == 'grid') {
+                    const albumsViewSettingsModal = new AlbumsViewSettingsModal();
+                    albumsViewSettingsModal.open();
+                }
+                if (gui.currentView == 'list') {
+                    const songsViewSettingsModal = new SongsViewSettingsModal();
+                    songsViewSettingsModal.open();
+                }
             });
         }
     }
+
     initSearchField() {
         gui.searchField.addEventListener('input', (e) => {
-            clearTimeout(searchDebounceTimeout);
-            searchDebounceTimeout = setTimeout(() => {
+            clearTimeout(this.searchDebounceTimeout);
+            this.searchDebounceTimeout = setTimeout(() => {
                 const query = e.target.value.trim();
                 if (query === '') {
                     musicLibrary.data = [...musicLibrary.masterData];
@@ -569,7 +658,7 @@ class GuiController {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
                 if (!GuiHelper.isAnyModalOpen()) {
                     e.preventDefault();
-                    if (searchField) {
+                    if (gui.searchField) {
                         gui.searchField.focus();
                         gui.searchField.select(); 
                     }
@@ -577,6 +666,7 @@ class GuiController {
             }
         });
     }
+
     initApplicationMenuBtn() {
         gui.appMenuBtn.addEventListener('mousedown', (e) => {
             queuePopover.container.classList.add('hidden');
@@ -588,18 +678,19 @@ class GuiController {
             }
         });
     }
+
     initPlayPauseBtn() {
-        playPauseBtnPlayingIcon.style.display = 'none';
+        gui.playPauseBtnPlayingIcon.style.display = 'none';
         gui.playPauseBtn.addEventListener('click', () => {
             if (!myAudioPlayer.htmlAudioElement.src) return;
             if (myAudioPlayer.isPlaying) {
                 myAudioPlayer.htmlAudioElement.pause();
-                playPauseBtnPlayingIcon.style.display = 'none';
-                playPauseBtnPausedIcon.style.display = 'block';
+                gui.playPauseBtnPlayingIcon.style.display = 'none';
+                gui.playPauseBtnPausedIcon.style.display = 'block';
             } else {
                 myAudioPlayer.htmlAudioElement.play();
-                playPauseBtnPausedIcon.style.display = 'none';
-                playPauseBtnPlayingIcon.style.display = 'block';
+                gui.playPauseBtnPausedIcon.style.display = 'none';
+                gui.playPauseBtnPlayingIcon.style.display = 'block';
             }
             myAudioPlayer.isPlaying = !myAudioPlayer.isPlaying;
         });
@@ -615,16 +706,11 @@ class GuiController {
             }
         });
     }
+
     initShuffleBtn() {
         gui.shuffleBtn.addEventListener('click', (e) => {
             myAudioPlayer.isShuffle = !myAudioPlayer.isShuffle;
-            e.target.classList.toggle('active', myAudioPlayer.isShuffle);
-            if (currentTrackIndex !== -1) {
-                myAudioPlayer.buildContextQueue(currentTrackIndex);
-                if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
-                    queuePopover.render();
-                }
-            }
+            // e.target.classList.toggle('active', myAudioPlayer.isShuffle);
             if (myAudioPlayer.isShuffle) {
                 document.getElementById('shuffle-btn').innerHTML =
                 '<svg class="btn-icon" viewBox="0 -960 960 960">' +
@@ -638,14 +724,21 @@ class GuiController {
                 '</svg>'
                 ;
             }
+            if (myAudioPlayer.currentPlayingPath) {
+                myAudioPlayer.buildContextQueue(myAudioPlayer.currentPlayingPath);
+            }
+            if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
+                queuePopover.render();
+            }
         });
     }
 
     initRepeatBtn() {
         gui.repeatBtn.addEventListener('click', () => {
+            console.log('repeat was ' + myAudioPlayer.repeatMode);
             if (myAudioPlayer.repeatMode === 'off') {
                 myAudioPlayer.repeatMode = 'all';
-                gui.repeatBtn.classList.add('active');
+                console.log('repeat is now ' + myAudioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406Z"/>' +
@@ -653,8 +746,8 @@ class GuiController {
                 ;
                 gui.repeatBtn.title = 'Repeat: All';
             } else if (myAudioPlayer.repeatMode === 'all') {
-                repeatmyAudioPlayer.repeatModeMode = 'one';
-                gui.repeatBtn.classList.add('active');
+                myAudioPlayer.repeatMode = 'one';
+                console.log('repeat is now ' + myAudioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406ZM460-540v150q0 13 8.5 21.5T490-360q13 0 21.5-8.5T520-390v-170q0-17-11.5-28.5T480-600h-50q-13 0-21.5 8.5T400-570q0 13 8.5 21.5T430-540h30Z"/>' +
@@ -663,7 +756,7 @@ class GuiController {
                 gui.repeatBtn.title = 'Repeat: One';
             } else {
                 myAudioPlayer.repeatMode = 'off';
-                gui.repeatBtn.classList.remove('active');
+                console.log('repeat is now ' + myAudioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="m274-200 34 34q12 12 11.5 28T308-110q-12 12-28.5 12.5T251-109L148-212q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l103-103q12-12 28.5-11.5T308-370q11 12 11.5 28T308-314l-34 34h406v-120q0-17 11.5-28.5T720-440q17 0 28.5 11.5T760-400v120q0 33-23.5 56.5T680-200H274Zm412-480H280v120q0 17-11.5 28.5T240-520q-17 0-28.5-11.5T200-560v-120q0-33 23.5-56.5T280-760h406l-34-34q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T709-851l103 103q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L709-589q-12 12-28.5 11.5T652-590q-11-12-11.5-28t11.5-28l34-34Z"/>' +
@@ -699,12 +792,12 @@ class GuiController {
 
     initPrevBtn() {
         gui.prevBtn.addEventListener('click', async () => {
-            if (!currentPlayingPath) return;
+            if (!myAudioPlayer.currentPlayingPath) return;
             if (myAudioPlayer.htmlAudioElement.currentTime > SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
                 myAudioPlayer.htmlAudioElement.currentTime = 0;
                 gui.progressBar.value = myAudioPlayer.htmlAudioElement.currentTime;
             } else {
-                const targetPath = myAudioPlayer.getPreviousTrackPath(currentPlayingPath);
+                const targetPath = myAudioPlayer.getPreviousTrackPath(myAudioPlayer.currentPlayingPath);
                 if (targetPath) {
                     myAudioPlayer.manualQueue = [];
                     myAudioPlayer.buildContextQueue(targetPath);
@@ -797,7 +890,7 @@ class GuiHelper {
     static isAnyModalOpen() {
         const MODAL_IDS = [
             ErrorMessageModal.containerId,
-            ViewSettingsModal.containerId,
+            AlbumsViewSettingsModal.containerId,
             AppSettingsModal.containerId,
             'edit-modal-overlay'
         ];
@@ -823,19 +916,24 @@ class GuiHelper {
         if (coverHash) {
             return `http://127.0.0.1:65432/?art=${coverHash}`;
         }
-        return COVER_PLACEHOLDER_PATH;
+        return gui.COVER_PLACEHOLDER_PATH;
     }
 }
 
 
 class SongsView {
+
     constructor() {
         this.trackListContainer = document.getElementById('track-list-container');
         this.trackList = document.getElementById('track-list');
         this.LIST_VIEW_ROW_HEIGHT = 52; 
         this.LIST_VIEW_ROW_BUFFER = 10;
+        this.lastClickedIndex = null;
+        this.currentSort = { field: null, ascending: true };
+        this.showCoverArt = true;
         this.addEventListeners();
     }
+
     renderVirtualList() {
         if (!musicLibrary.data.length) {
             this.trackList.innerHTML = '';
@@ -859,13 +957,14 @@ class SongsView {
         this.trackList.innerHTML = '';
         this.trackList.appendChild(fragment);
     }
+
     createListItem(libraryIndex) {
         const i = libraryIndex;
         const track = musicLibrary.data[i];
         const li = document.createElement('li');
         const isSelected = selectedPaths.has(track.file_path) ? ' track-selected' : '';
         const isMissing = track.missing ? ' track-missing' : '';
-        const isPlaying = (currentPlayingPath && track.file_path === currentPlayingPath) ? ' track-playing' : '';
+        const isPlaying = (myAudioPlayer.currentPlayingPath && track.file_path === myAudioPlayer.currentPlayingPath) ? ' track-playing' : '';
         const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';      
         li.style.transform = `translateY(${i * this.LIST_VIEW_ROW_HEIGHT}px)`;
         li.dataset.index = i; 
@@ -880,14 +979,47 @@ class SongsView {
         `;
         return li
     }
+
+    sortLibrary(field) {
+        if (this.currentSort.field === field) {
+            this.currentSort.ascending = !this.currentSort.ascending;
+        } else {
+            this.currentSort.field = field;
+            this.currentSort.ascending = true;
+        }
+        musicLibrary.data.sort((a, b) => {
+            let valA = a[field].toString().toLowerCase();
+            let valB = b[field].toString().toLowerCase();
+            if (field === 'year') {
+                valA = parseInt(valA) || 0;
+                valB = parseInt(valB) || 0;
+            }
+            if (valA < valB) return this.currentSort.ascending ? -1 : 1;
+            if (valA > valB) return this.currentSort.ascending ? 1 : -1;
+            return 0;
+        });
+        this.renderVirtualList();
+        myAudioPlayer.refreshDynamicQueue();
+        this.updateSortIndicators();
+    }
+
+    updateSortIndicators() {
+        document.querySelectorAll('.col-sortable').forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc');
+                        if (header.dataset.sort === this.currentSort.field) {
+                header.classList.add(this.currentSort.ascending ? 'sort-asc' : 'sort-desc');
+            }
+        });
+    }
+
     singleClickOnListTrack(e) {
         const row = e.target.closest('li');
         if (!row) return;
         const trackIndex = parseInt(row.dataset.index);
         const track = musicLibrary.data[trackIndex];
-        if (e.shiftKey && lastClickedIndex !== null) {
-            const start = Math.min(lastClickedIndex, trackIndex);
-            const end = Math.max(lastClickedIndex, trackIndex);
+        if (e.shiftKey && this.lastClickedIndex !== null) {
+            const start = Math.min(this.lastClickedIndex, trackIndex);
+            const end = Math.max(this.lastClickedIndex, trackIndex);
             if (!e.ctrlKey && !e.metaKey) { selectedPaths.clear(); }
             for (let i = start; i <= end; i++) {
                 selectedPaths.add(musicLibrary.data[i].file_path);
@@ -898,14 +1030,15 @@ class SongsView {
             } else {
                 selectedPaths.add(track.file_path);
             }
-            lastClickedIndex = trackIndex;
+            this.lastClickedIndex = trackIndex;
         } else {
             selectedPaths.clear();
             selectedPaths.add(track.file_path);
-            lastClickedIndex = trackIndex;
+            this.lastClickedIndex = trackIndex;
         }
         this.renderVirtualList();
     }
+
     async doubleClickOnTrack(e) {
         const row = e.target.closest('li');
         if (!row) return;
@@ -915,6 +1048,7 @@ class SongsView {
         myAudioPlayer.playbackContext = { type: 'list', key: null };    
         await myAudioPlayer.requestPlayback(targetPath, 1, true);
     }
+
     addEventListeners() {
         this.trackListContainer.addEventListener('scroll', () => {
             window.requestAnimationFrame(() => {
@@ -922,12 +1056,12 @@ class SongsView {
             });
         });
         this.trackList.addEventListener('click', (e) => {
-            if (!doubleClickOnTrackPossible) {
+            if (!gui.doubleClickOnTrackPossible) {
                 songsView.singleClickOnListTrack(e);
-                doubleClickOnTrackPossible = true;
+                gui.doubleClickOnTrackPossible = true;
                 setTimeout(() => {
-                    doubleClickOnTrackPossible = false;
-                }, doubleClickDelay);
+                    gui.doubleClickOnTrackPossible = false;
+                }, DOUBLE_CLICK_DELAY);
             } else {
                 this.doubleClickOnTrack(e);
             }
@@ -948,7 +1082,13 @@ class SongsView {
                 gui.trackContextMenu.hide(e);
             }
         });
+        document.querySelectorAll('.col-sortable').forEach(header => {
+            header.addEventListener('click', () => {
+                this.sortLibrary(header.dataset.sort); }
+            );
+        });
     }
+
 }
 
 
@@ -962,6 +1102,7 @@ class AlbumsView {
         this.gridAlbumsParsedData = [];      // NEW: Holds parsed album data
         this.albumGrid = document.getElementById('album-grid');
         this.activeExpandedCard = null; // Tracks which album is currently open
+        this.lastGridClickedIndex = null;
     }
     processAlbums() {
         const albumMap = new Map();
@@ -1127,7 +1268,7 @@ class AlbumsView {
                 trackListHTML += `<li class="disc-header">Disc ${trackDisc}</li>`;
                 currentDisc = trackDisc;
             }
-            const isPlaying = (currentPlayingPath && t.file_path === currentPlayingPath) ? ' track-playing' : '';
+            const isPlaying = (myAudioPlayer.currentPlayingPath && t.file_path === myAudioPlayer.currentPlayingPath) ? ' track-playing' : '';
             const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
             const missingWarning = t.missing ? '⚠️ ' : '';
             trackListHTML += `
@@ -1181,13 +1322,13 @@ class AlbumsView {
         expandedList.addEventListener('click', (e) => {
             const li = e.target.closest('li');
             if (!li || li.classList.contains('disc-header')) return;
-            if (!doubleClickOnTrackPossible) {
+            if (!gui.doubleClickOnTrackPossible) {
                 const trackAlbumIndex = parseInt(li.dataset.albumIndex);
                 const track = albumData.tracks[trackAlbumIndex];
-                if (e.shiftKey && lastGridClickedIndex !== null) {
+                if (e.shiftKey && this.lastGridClickedIndex !== null) {
                     const start = Math.min(
-                        lastGridClickedIndex, trackAlbumIndex);
-                    const end = Math.max(lastGridClickedIndex, trackAlbumIndex);
+                        this.lastGridClickedIndex, trackAlbumIndex);
+                    const end = Math.max(this.lastGridClickedIndex, trackAlbumIndex);
                     if (!e.ctrlKey && !e.metaKey) { selectedPaths.clear(); }
                     for (let i = start; i <= end; i++) {
                         selectedPaths.add(albumData.tracks[i].file_path);
@@ -1198,11 +1339,11 @@ class AlbumsView {
                     } else {
                         selectedPaths.add(track.file_path);
                     }
-                    lastGridClickedIndex = trackAlbumIndex;
+                    this.lastGridClickedIndex = trackAlbumIndex;
                 } else {
                     selectedPaths.clear();
                     selectedPaths.add(track.file_path);
-                    lastGridClickedIndex = trackAlbumIndex;
+                    this.lastGridClickedIndex = trackAlbumIndex;
                 }
                 Array.from(expandedList.children).forEach(child => {
                     if (child.classList.contains('disc-header')) return; 
@@ -1211,10 +1352,10 @@ class AlbumsView {
                     }
                     else child.classList.remove('track-selected');
                 });
-                doubleClickOnTrackPossible = true;
+                gui.doubleClickOnTrackPossible = true;
                 setTimeout(
-                    () => { doubleClickOnTrackPossible = false; },
-                    doubleClickDelay
+                    () => { gui.doubleClickOnTrackPossible = false; },
+                    DOUBLE_CLICK_DELAY
                 );
             } else {
                 window.getSelection().removeAllRanges(); 
@@ -1496,7 +1637,6 @@ class QueuePopover {
     }
 
     render() {
-        console.log('popup is being rendered...');
         this.queueList.innerHTML = '';   
         const combinedQueue = myAudioPlayer.manualQueue.concat(myAudioPlayer.contextQueue); 
         this.visuallyCombineQueues(combinedQueue);
@@ -1509,7 +1649,6 @@ class QueuePopover {
 
     visuallyCombineQueues(combinedQueue) {
         const displayQueue = combinedQueue.slice(0, this.displayLimit);
-        console.log(displayQueue);
         displayQueue.forEach((trackPath, visualIndex) => {
             // Resolve the absolute path against the master library!
             const track = musicLibrary.masterData.find(t => t.file_path === trackPath);
@@ -1575,11 +1714,14 @@ class MyAudioPlayer {
         this.volumeLevel = this.volumeMax;
         this.isNormalized = true;
         this.isPlaying = false;
+
         this.isShuffle = false;
         this.repeatMode = 'off';
+
         this.playbackContext = { type: 'list', key: null }; // Tracks 'list' or 'album' context
         this.manualQueue = [];  // NEW: Tracks manually added by user
         this.contextQueue = []; // NEW: Tracks automatically generated by the album/list
+        this.currentPlayingPath = null
         this.initHtmlAudio();
     }
 
@@ -1602,8 +1744,8 @@ class MyAudioPlayer {
                 await this.requestPlayback(targetPath, 1, false);
             } else {
                 this.isPlaying = false;
-                playPauseBtnPausedIcon.style.display = 'block';
-                playPauseBtnPlayingIcon.style.display = "none";
+                gui.playPauseBtnPausedIcon.style.display = 'block';
+                gui.playPauseBtnPlayingIcon.style.display = "none";
                 gui.currentTimeEl.style.visibility = 'hidden';
                 gui.totalTimeEl.style.visibility = 'hidden';
                 gui.progressBar.disabled = true;
@@ -1614,8 +1756,8 @@ class MyAudioPlayer {
 
     initWebAudio() {
         if (this.audioCtx) return; 
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        this.audioSource = audioCtx.createMediaElementSource(this.htmlAudioElement);
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.audioSource = this.audioCtx.createMediaElementSource(this.htmlAudioElement);
         this.compressor = new DynamicsCompressorNode(this.audioCtx, {
             threshold: -50,
             knee: 40,
@@ -1671,12 +1813,12 @@ class MyAudioPlayer {
     }
 
     playTrack(track) {
-        currentPlayingPath = track.file_path;
+        this.currentPlayingPath = track.file_path;
         songsView.renderVirtualList();
         const expandedList = document.getElementById('expanded-track-list');
         if (expandedList) {
             Array.from(expandedList.children).forEach(li => {
-                if (li.dataset.filepath === currentPlayingPath) li.classList.add('track-playing');
+                if (li.dataset.filepath === this.currentPlayingPath) li.classList.add('track-playing');
                 else li.classList.remove('track-playing');
             });
         }
@@ -1688,8 +1830,8 @@ class MyAudioPlayer {
         this.htmlAudioElement.src = safePath;
         this.htmlAudioElement.play();
         this.isPlaying = true;
-        playPauseBtnPlayingIcon.style.display = 'block';
-        playPauseBtnPausedIcon.style.display = 'none';
+        gui.playPauseBtnPlayingIcon.style.display = 'block';
+        gui.playPauseBtnPausedIcon.style.display = 'none';
         gui.currentTimeEl.style.visibility = 'initial';
         gui.totalTimeEl.style.visibility = 'initial';
         gui.progressBar.disabled = false;
@@ -1742,7 +1884,7 @@ class MyAudioPlayer {
                 } else {
                     this.contextQueue = pool.slice(1);
                 }
-                if (masterLibraryData.find(t => t.file_path === firstPath && !t.missing)) return firstPath;
+                if (musicLibrary.masterData.find(t => t.file_path === firstPath && !t.missing)) return firstPath;
                 return firstPath; // If missing, requestPlayback's bouncer will handle it naturally
             }
         }
@@ -1752,17 +1894,16 @@ class MyAudioPlayer {
     getPreviousTrackPath(startPath) {
         let pool = musicLibrary.getPoolOfAllowedTracks();
         let poolIndex = pool.indexOf(startPath);
-        if (pool <= 0) {
-            if (myAudioPlayer.repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
+        if (poolIndex <= 0) {
+            if (this.repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
             return null;
         }
         return pool[poolIndex - 1];
     }
     
     refreshDynamicQueue() {
-        if (this.playbackContext.type === 'list' && currentPlayingPath) {
-            this.buildContextQueue(currentPlayingPath);
-            console.log('context queue has just been built');
+        if (this.playbackContext.type === 'list' && this.currentPlayingPath) {
+            this.buildContextQueue(this.currentPlayingPath);
             if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
                 queuePopover.render();
             }
@@ -1772,141 +1913,9 @@ class MyAudioPlayer {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-function sortLibrary(field) {
-    if (currentSort.field === field) {
-        currentSort.ascending = !currentSort.ascending;
-    } else {
-        currentSort.field = field;
-        currentSort.ascending = true;
-    }
-
-    musicLibrary.data.sort((a, b) => {
-        let valA = a[field].toString().toLowerCase();
-        let valB = b[field].toString().toLowerCase();
-        if (field === 'year') {
-            valA = parseInt(valA) || 0;
-            valB = parseInt(valB) || 0;
-        }
-        if (valA < valB) return currentSort.ascending ? -1 : 1;
-        if (valA > valB) return currentSort.ascending ? 1 : -1;
-        return 0;
-    });
-    songsView.renderVirtualList();
-    myAudioPlayer.refreshDynamicQueue();
-}
-
-document.querySelectorAll('.col-sortable').forEach(header => {
-    header.addEventListener('click', () => { sortLibrary(header.dataset.sort); });
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function suppressContextMenuGlobally() {
-    document.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        const isTrack = e.target.closest('li:not(.disc-header)');
-        const isCard = e.target.closest('.album-card');
-        const isInteractive = e.target.closest(
-            'button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover, #edit-modal-overlay, #grid-settings-modal, #application-menu');    
-        if (!isTrack && !isCard && !isInteractive) {
-            clearSelection();
-            gui.trackContextMenu.hide();
-        }
-    });
-}
-
-suppressContextMenuGlobally();
-
-function forceKeyboardFocusRelease() {
-    document.querySelectorAll('input[type="range"]').forEach(slider => {
-        slider.addEventListener('pointerup', () => {slider.blur();});
-    });
-    document.querySelectorAll('button').forEach(button => {
-        button.addEventListener('pointerup', () => {button.blur();});
-    });
-}
-
-document.addEventListener('click', (e) => {
-    const isTrack = e.target.closest('li:not(.disc-header)');
-    const isCard = e.target.closest('.album-card');
-    const isInteractive = e.target.closest(
-        'button, input, .player-bar, .app-header, .list-header, #context-menu, #queue-popover, #edit-modal-overlay, #grid-settings-modal, #application-menu');    
-    if (!isTrack && !isCard && !isInteractive) {
-        clearSelection();
-    }
-});
-
-function clearSelection() { // visual and logical
-    if (selectedPaths.size > 0) {
-        selectedPaths.clear();
-        lastClickedIndex = null;
-        lastGridClickedIndex = null;
-        if (gui.currentView === 'list') {
-            songsView.renderVirtualList();
-        } else { // currentView == 'grid'
-            const expandedList = document.getElementById('expanded-track-list');
-            if (expandedList) {
-                Array.from(expandedList.children).forEach(child => {
-                    child.classList.remove('track-selected');
-                });
-            }
-        }
-    }
-}
-
-forceKeyboardFocusRelease();
-
-
-
-
-const myAudioPlayer = new MyAudioPlayer();
 const gui = new Gui();
 const guiController = new GuiController();
+const myAudioPlayer = new MyAudioPlayer();
 const musicLibrary = new MusicLibrary();
 const songsView = new SongsView();
 const albumsView = new AlbumsView();

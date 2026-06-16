@@ -338,10 +338,32 @@ body {
 .col-sortable {
   cursor: pointer;
   transition: color 0.2s;
+  user-select: none; /* Prevents text highlighting when double-clicking to sort */
 }
 
 .col-sortable:hover {
   color: var(--accent);
+}
+
+/* --- NEW: Sorting Arrow Indicators --- */
+.col-sortable.sort-asc {
+  color: var(--accent); /* Keeps the active column highlighted */
+}
+
+.col-sortable.sort-asc::after {
+  content: ' ▲';
+  font-size: 10px;
+  vertical-align: middle;
+}
+
+.col-sortable.sort-desc {
+  color: var(--accent);
+}
+
+.col-sortable.sort-desc::after {
+  content: ' ▼';
+  font-size: 10px;
+  vertical-align: middle;
 }
 
 /* =========================================
@@ -603,11 +625,6 @@ button.icon-btn svg.btn-icon {
   border-radius: 4px;
   position: relative;
   overflow: hidden;
-}
-
-.np-info:hover {
-  background: var(--btn-bg-hover-color);
-  cursor: pointer;
 }
 
 #np-title {
@@ -1177,6 +1194,7 @@ input#volume-bar::-webkit-slider-thumb {
 #app-settings-modal,
 #error-modal,
 #grid-settings-modal,
+#list-settings-modal,
 #edit-modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
