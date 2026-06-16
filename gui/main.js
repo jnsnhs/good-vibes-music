@@ -1440,6 +1440,7 @@ class QueuePopover {
     }
 
     render() {
+        console.log('popup is being rendered...');
         this.queueList.innerHTML = '';   
         const combinedQueue = manualQueue.concat(contextQueue); 
         this.visuallyCombineQueues(combinedQueue);
@@ -1452,8 +1453,10 @@ class QueuePopover {
 
     visuallyCombineQueues(combinedQueue) {
         const displayQueue = combinedQueue.slice(0, this.displayLimit);
-        displayQueue.forEach((trackIndex, visualIndex) => {
-            const track = musicLibrary.data[trackIndex];
+        console.log(displayQueue);
+        displayQueue.forEach((trackPath, visualIndex) => {
+            // Resolve the absolute path against the master library!
+            const track = musicLibrary.masterData.find(t => t.file_path === trackPath);
             if (!track) return;
             const li = document.createElement('li');
             const isManual = visualIndex < manualQueue.length;
@@ -1626,11 +1629,13 @@ function getPreviousTrackPath(startPath) {
 }
 
 function refreshDynamicQueue() {
-    // ONLY rebuild if the user is listening to a List. Albums remain static!
+    console.log('refreshDynamic Queue...')
     if (playbackContext.type === 'list' && currentPlayingPath) {
         buildContextQueue(currentPlayingPath);
+        console.log('context queue has just been built');
         if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
             queuePopover.render();
+            console.log('popover render method being fired')
         }
     }
 }
@@ -1686,15 +1691,6 @@ class MyAudioPlayer {
 }
 
 const myAudioPlayer = new MyAudioPlayer();
-
-async function doubleClickOnTrack_OLD(e) {
-    const row = e.target.closest('li');
-    if (!row) return;
-    const trackIndex = parseInt(row.dataset.index);
-    window.getSelection().removeAllRanges(); 
-    playbackContext = { type: 'list', key: null };    
-    await requestPlayback(trackIndex, 1, true);
-}
 
 async function doubleClickOnTrack(e) {
     const row = e.target.closest('li');
@@ -1784,119 +1780,6 @@ document.querySelectorAll('.col-sortable').forEach(header => {
     header.addEventListener('click', () => { sortLibrary(header.dataset.sort); });
 });
 
-
-
-// --- NEW: QUEUE ARCHITECTURE ---
-
-// 1. Gathers the pool of allowed tracks based on current context
-// function getPool() {
-//     if (playbackContext.type === 'album') {
-//         const album = albumsView.gridAlbumsParsedData.find(a => a.key === playbackContext.key);
-//         if (album) return album.tracks.map(t => t.globalIndex);
-//     }
-//     return musicLibrary.data.map((_, i) => i);
-// }
-
-// 2. Builds the automatic remaining queue, handling Shuffle automatically
-// function buildContextQueue(startIndex) {
-//     let pool = getPool();
-//     let poolIndex = pool.indexOf(startIndex);
-//     if (poolIndex === -1) poolIndex = 0;
-
-//     let remaining = pool.slice(poolIndex + 1);
-
-//     // If shuffle is active, generate the random sequence right now!
-//     if (isShuffle) {
-//         for (let i = remaining.length - 1; i > 0; i--) {
-//             const j = Math.floor(Math.random() * (i + 1));
-//             [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-//         }
-//     }
-//     contextQueue = remaining;
-// }
-
-// 3. Replaces direction === 1 logic (Pulls next track from the queues)
-// function popNextTrackFromQueue() {
-//     // Priority 1: User queued tracks
-//     while (manualQueue.length > 0) {
-//         const nextIndex = manualQueue.shift();
-//         if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
-//     }
-//     // Priority 2: Standard Context queue
-//     while (contextQueue.length > 0) {
-//         const nextIndex = contextQueue.shift();
-//         if (musicLibrary.data[nextIndex] && !musicLibrary.data[nextIndex].missing) return nextIndex;
-//     }
-//     // Priority 3: End of queue reached, handle Repeat All
-//     if (repeatMode === 'all') {
-//         let pool = getPool();
-//         if (pool.length > 0) {
-//             let firstIndex = pool[0];
-//             if (isShuffle) {
-//                 let shuffled = [...pool];
-//                 for (let i = shuffled.length - 1; i > 0; i--) {
-//                     const j = Math.floor(Math.random() * (i + 1));
-//                     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-//                 }
-//                 firstIndex = shuffled.shift();
-//                 contextQueue = shuffled;
-//             } else {
-//                 contextQueue = pool.slice(1);
-//             }
-//             if (musicLibrary.data[firstIndex] && !musicLibrary.data[firstIndex].missing) return firstIndex;
-//             // If the first is missing, it will organically drop to the next one on the subsequent request
-//             return firstIndex;
-//         }
-//     }
-//     return -1;
-// }
-
-// 4. Replaces direction === -1 logic (Going backwards safely)
-// function getPreviousTrackIndex(startIndex) {
-//     let pool = getPool();
-//     let poolIndex = pool.indexOf(startIndex);
-//     if (poolIndex <= 0) {
-//         if (repeatMode === 'all' && pool.length > 0) return pool[pool.length - 1];
-//         return -1;
-//     }
-//     return pool[poolIndex - 1];
-// }
-
-async function requestPlayback_OLD(targetIndex, direction = 1, isManualClick = false) {
-    if (musicLibrary.data.length === 0 || targetIndex === -1) return;
-    const track = musicLibrary.data[targetIndex];
-    const exists = await window.pywebview.api.check_file_exists(track.file_path);
-
-    if (!exists) {
-        track.missing = true;
-        songsView.renderVirtualList();
-        if (isManualClick) {
-            if (confirm(`The file for "${track.title}" has been moved or deleted since the app opened.\n\nWould you like to locate it manually?`)) {
-                const response = await window.pywebview.api.locate_missing_file(track.file_path);
-                if (response.status === 'success') {
-                    requestPlayback(targetIndex, direction, isManualClick);
-                }
-            }
-        } else {
-            console.warn(`Skipping missing track: ${track.title}`);
-            // --- UPDATED LOGIC ---
-            const nextValidIndex = direction === 1 ? popNextTrackFromQueue() : getPreviousTrackIndex(targetIndex);
-            if (nextValidIndex !== -1 && nextValidIndex !== targetIndex) {
-                requestPlayback(nextValidIndex, direction, false);
-            }
-        }
-        return;
-    }
-
-    if (isManualClick) {
-        manualQueue = [];
-        buildContextQueue(targetIndex);
-    }
-
-    currentTrackIndex = targetIndex;
-    playTrack(track);
-}
-
 async function requestPlayback(targetPath, direction = 1, isManualClick = false) {
     if (musicLibrary.data.length === 0 || !targetPath) return;
     const track = musicLibrary.masterData.find(t => t.file_path === targetPath);
@@ -1934,7 +1817,10 @@ async function requestPlayback(targetPath, direction = 1, isManualClick = false)
         manualQueue = [];
         buildContextQueue(targetPath);
         console.log('targetPath: ' + targetPath);
-        console.log('contextQueue (0-9): ' + contextQueue.slice(0, 9))
+        console.log('contextQueue (0-9): ');
+        contextQueue.slice(0, 9).forEach(t => {
+            console.log(t);
+        });
     }
 
     playTrack(track);
@@ -2040,4 +1926,3 @@ const musicLibrary = new MusicLibrary();
 const songsView = new SongsView();
 const albumsView = new AlbumsView();
 const queuePopover = new QueuePopover();
-
