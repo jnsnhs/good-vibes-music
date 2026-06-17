@@ -407,6 +407,6 @@ if __name__ == '__main__':
         height=600,
         resizable=True,
         frameless=False,
-        min_size=(816, 420)
+        min_size=(816, 584)
     )
     webview.start(debug=True)
