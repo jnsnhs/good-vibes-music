@@ -13,8 +13,10 @@
   --dabade-blue-light: #E3F2FD;
   --moody-indigo-light: #E8EAF6;
 
-
   --accent: #505050;
+
+  --scrollbar-width: 12px;
+  --track-hover-color: #2222440a;
 }
 
 @media (prefers-color-scheme: light) {
@@ -180,39 +182,39 @@ body {
 
 
 #search-input:not(:placeholder-shown) {
-  border-color: green;
-}
-
-#serach-input:placeholder-shown {
-  border-color: red;
+  border: 2px solid var(--btn-icon-color);
+  width: 100%;
+  font-weight: bold;
+  color: var(--btn-icon-color);
 }
 
 #search-input {
-  width: 100%;
+  width: 25vw;
   /* max-width: 400px; */
-  min-width: 100px;
+  min-width: 120px;
   box-sizing: border-box;
-  text-align: left;
+  text-align: center;
   padding: 4px 8px;
   border-radius: 7px;
   border: 1px solid var(--border-color);
-  background-color: var(--bg-input);
+  background-color: transparent;
   color: var(--text-main);
   outline: none;
   font-size: 13px;
   height: 30px;
   transition:
     border-color 0.2s,
-    background-color 0.3s,
-    color 0.3s;
-}
+    width 0.1s;
+  }
 
 #search-input::before {
   content: "fieowihg";
 }
 
 #search-input:focus {
-  border: 2px solid var(--accent);
+  /* border: 2px solid var(--btn-icon-color); */
+  width: 100%;
+  background-color: var(--bg-input);
   /* box-shadow: 0px 0px 2px var(--accent) inset; */
 }
 
@@ -247,12 +249,14 @@ body {
   flex-direction: column;
   overflow: hidden;
   padding: 0;
+
 }
 
 #track-list-container {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: scroll;
   position: relative;
+
 }
 
 #track-list {
@@ -269,11 +273,10 @@ body {
   box-sizing: border-box;
   display: grid;
   grid-template-columns:
-    35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr)
-    50px 50px 30px;
+    35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 0.7fr);
   align-items: center;
   gap: 15px;
-  padding: 0 20px;
+  padding: 0 calc(30px - var(--scrollbar-width) ) 0 20px;
   border-bottom: 1px solid var(--border-light);
   cursor: pointer;
   color: var(--text-secondary);
@@ -281,7 +284,7 @@ body {
 }
 
 #track-list li:hover {
-  background-color: var(--bg-hover);
+  background-color: var(--track-hover-color);
 }
 
 .track-cover {
@@ -304,30 +307,13 @@ body {
   font-weight: 500;
 }
 
-.remove-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-}
-
-.remove-btn:hover {
-  color: var(--danger);
-  background: none;
-}
-
 .list-header {
   display: grid;
   grid-template-columns:
-    35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr)
-    50px 50px 30px;
+    35px minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 0.7fr);
   gap: 15px;
-  padding: 12px 20px 8px 20px;
+  row-gap: 0px;
+  padding: 12px 30px 8px 20px;
   border-bottom: 2px solid var(--border-color);
   font-weight: bold;
   color: var(--text-secondary);
@@ -338,22 +324,22 @@ body {
 .col-sortable {
   cursor: pointer;
   transition: color 0.2s;
-  user-select: none; /* Prevents text highlighting when double-clicking to sort */
+  user-select: none;
 }
 
 .col-sortable:hover {
   color: var(--accent);
 }
 
-/* --- NEW: Sorting Arrow Indicators --- */
 .col-sortable.sort-asc {
-  color: var(--accent); /* Keeps the active column highlighted */
+  color: var(--accent);
 }
 
 .col-sortable.sort-asc::after {
   content: ' ▲';
+  margin-left: 0.2em;
   font-size: 10px;
-  vertical-align: middle;
+  vertical-align:top;
 }
 
 .col-sortable.sort-desc {
@@ -362,14 +348,20 @@ body {
 
 .col-sortable.sort-desc::after {
   content: ' ▼';
+  margin-left: 0.2em;
   font-size: 10px;
-  vertical-align: middle;
+  vertical-align: bottom;
 }
 
-/* --- UPDATED: Optional Cover Art Toggling --- */
 #list-view-wrapper.hide-covers .list-header,
 #list-view-wrapper.hide-covers #track-list li {
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 50px 50px 30px;
+  grid-template-columns:
+  minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 0.7fr);
+}
+
+#list-view-wrapper.hide-covers .list-header {
+  padding-left: 30px;
+  padding-right: 30px;
 }
 
 #list-view-wrapper.hide-covers .col-cover,
@@ -377,10 +369,26 @@ body {
   display: none;
 }
 
-/* NEW: Compress the row height when covers are hidden */
 #list-view-wrapper.hide-covers #track-list li {
+  padding: 0 calc(30px - var(--scrollbar-width) ) 0 30px;
   height: 32px; 
 }
+
+#list-header-year,
+#list-header-duration {
+  display: flex;
+  justify-content: end;
+}
+
+
+.track-duration,
+.track-year {
+  display: flex;
+  justify-content: end;
+}
+
+
+
 
 /* =========================================
    12. ALBUM GRID VIEW
@@ -388,11 +396,12 @@ body {
 
 #album-grid {
   display: grid;
-  /* Auto-fill creates as many columns as fit in the container */
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 20px;
   padding: 20px;
+  padding-right: 0px;
   position: relative;
+  overflow-y: scroll;
 }
 
 .album-card {
@@ -450,7 +459,7 @@ body {
 .album-expanded-row {
   grid-column: 1 / -1; /* Forces the element to span exactly 100% of the grid width */
   background-color: var(--bg-hover);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 25px;
   display: flex;
   gap: 30px;
@@ -518,7 +527,7 @@ body {
 }
 
 .expanded-track-list li:hover {
-  background-color: var(--bg-panel);
+  background-color: var(--track-hover-color);
 }
 
 .expanded-track-list li.disc-header {
@@ -873,13 +882,32 @@ input#volume-bar::-webkit-slider-thumb {
   gap: 10px;
 }
 
+
+
+.primary-btn, .secondary-btn {
+  font-size: 12px;
+  padding: 0.5em 0.75em;
+  min-width: 5em;
+}
+
+.primary-btn {
+  background-color: var(--accent);
+  color: var(--bg-main);
+  font-weight: bold;
+}
+.primary-btn:hover {
+  background-color: var(--accent);
+  color: var(--bg-panel);
+}
+
 .secondary-btn {
-  background-color: var(--bg-input);
-  color: var(--text-main);
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  font-weight: normal;
   border: 1px solid var(--border-color);
 }
 .secondary-btn:hover {
-  background-color: var(--bg-hover);
+  color: var(--text-main);
 }
 
 /* =========================================
@@ -887,7 +915,7 @@ input#volume-bar::-webkit-slider-thumb {
    ========================================= */
 
 ::-webkit-scrollbar {
-  width: 12px;
+  width: var(--scrollbar-width);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -941,7 +969,7 @@ input#volume-bar::-webkit-slider-thumb {
   cursor: default !important;
 }
 .track-missing .track-title {
-  color: var(--text-error, #ff5555);
+  color: var(--text-error, #2c1e1e);
   text-decoration: line-through;
 }
 .missing-icon {
@@ -951,8 +979,7 @@ input#volume-bar::-webkit-slider-thumb {
   display: inline-block;
 }
 .track-selected {
-  background-color: var(--bg-hover) !important;
-  border-left: 3px solid var(--accent);
+  background-color: #11112211 !important;
 }
 
 /* =========================================
@@ -1235,48 +1262,6 @@ kbd {
   gap: 10px;
   margin-top: 4px;
 }
-
-.accent-pill-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background-color: var(--bg-input);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.accent-pill-btn:hover {
-  color: var(--text-main);
-  background-color: var(--bg-hover);
-  border-color: var(--text-muted);
-}
-
-.accent-pill-btn.active {
-  border-color: var(--accent);
-  background-color: var(--bg-hover);
-  color: var(--text-main);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-/* Subtle accent color indicator dots */
-.color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.green-dot { background-color: #1db954; }
-.blue-dot { background-color: #007aff; }
-.red-dot { background-color: #ff3b30; }
-
 
 .input-group select.custom-select {
   background-color: var(--bg-input);

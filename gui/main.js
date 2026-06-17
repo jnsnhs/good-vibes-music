@@ -927,7 +927,7 @@ class SongsView {
         this.trackListContainer = document.getElementById('track-list-container');
         this.trackList = document.getElementById('track-list');
         this.LIST_VIEW_ROW_HEIGHT; 
-        this.LIST_VIEW_ROW_BUFFER = 10;
+        this.LIST_VIEW_ROW_BUFFER = 20;
         this.lastClickedIndex = null;
         this.currentSort = { field: null, ascending: true };
         this.showCoverArt = true;
@@ -1019,7 +1019,7 @@ class SongsView {
     updateSortIndicators() {
         document.querySelectorAll('.col-sortable').forEach(header => {
             header.classList.remove('sort-asc', 'sort-desc');
-                        if (header.dataset.sort === this.currentSort.field) {
+            if (header.dataset.sort === this.currentSort.field) {
                 header.classList.add(this.currentSort.ascending ? 'sort-asc' : 'sort-desc');
             }
         });
