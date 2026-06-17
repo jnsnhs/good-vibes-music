@@ -366,6 +366,22 @@ body {
   vertical-align: middle;
 }
 
+/* --- UPDATED: Optional Cover Art Toggling --- */
+#list-view-wrapper.hide-covers .list-header,
+#list-view-wrapper.hide-covers #track-list li {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) 50px 50px 30px;
+}
+
+#list-view-wrapper.hide-covers .col-cover,
+#list-view-wrapper.hide-covers .track-cover {
+  display: none;
+}
+
+/* NEW: Compress the row height when covers are hidden */
+#list-view-wrapper.hide-covers #track-list li {
+  height: 32px; 
+}
+
 /* =========================================
    12. ALBUM GRID VIEW
    ========================================= */

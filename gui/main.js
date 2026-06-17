@@ -926,7 +926,7 @@ class SongsView {
     constructor() {
         this.trackListContainer = document.getElementById('track-list-container');
         this.trackList = document.getElementById('track-list');
-        this.LIST_VIEW_ROW_HEIGHT = 52; 
+        this.LIST_VIEW_ROW_HEIGHT; 
         this.LIST_VIEW_ROW_BUFFER = 10;
         this.lastClickedIndex = null;
         this.currentSort = { field: null, ascending: true };
@@ -935,6 +935,15 @@ class SongsView {
     }
 
     renderVirtualList() {
+        const wrapper = document.getElementById('list-view-wrapper');
+        if (this.showCoverArt) {
+            wrapper.classList.remove('hide-covers');
+            this.LIST_VIEW_ROW_HEIGHT = 52; // Standard height
+        } else {
+            wrapper.classList.add('hide-covers');
+            this.LIST_VIEW_ROW_HEIGHT = 32; // Compact, dense height
+        }
+
         if (!musicLibrary.data.length) {
             this.trackList.innerHTML = '';
             return;
@@ -966,11 +975,15 @@ class SongsView {
         const isMissing = track.missing ? ' track-missing' : '';
         const isPlaying = (myAudioPlayer.currentPlayingPath && track.file_path === myAudioPlayer.currentPlayingPath) ? ' track-playing' : '';
         const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';      
+        const coverArtHTML = this.showCoverArt 
+            ? `<img class="track-cover" id="cover-${i}" src="${GuiHelper.getCoverUrl(track.cover_hash)}" alt="">` 
+            : ``;
+        
         li.style.transform = `translateY(${i * this.LIST_VIEW_ROW_HEIGHT}px)`;
         li.dataset.index = i; 
         li.className = `${isMissing}${isSelected}${isPlaying}`;
         li.innerHTML = `
-            <img class="track-cover" id="cover-${i}" src="${GuiHelper.getCoverUrl(track.cover_hash)}" alt="">
+            ${coverArtHTML}
             <div class="track-title">${missingWarning}${track.title}</div>
             <div class="track-artist">${track.artist}</div>
             <div class="track-album">${track.album}</div>
