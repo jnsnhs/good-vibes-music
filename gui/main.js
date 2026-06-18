@@ -8,9 +8,9 @@ class Preferences {
         this.SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
         this.SEARCH_DEBOUNCE_TIME = 300;
         this.accentThemes = {
-            green: '#1db954',
-            blue: '#007aff',
-            red: '#ff3b30'
+            green: '#008071',
+            blue: '#2962FF',
+            red: '#D62000'
         };
         this.savedAccent = 'blue';
         this.showCoverArt = false;
