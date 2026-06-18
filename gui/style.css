@@ -182,10 +182,10 @@ body {
 
 
 #search-input:not(:placeholder-shown) {
-  border: 2px solid var(--btn-icon-color);
+  border: 1px solid var(--accent);
   width: 100%;
   font-weight: bold;
-  color: var(--btn-icon-color);
+  color: var(--accent);
 }
 
 #search-input {
@@ -213,7 +213,6 @@ body {
 
 #search-input:focus {
   /* border: 2px solid var(--btn-icon-color); */
-  width: 100%;
   background-color: var(--bg-input);
   /* box-shadow: 0px 0px 2px var(--accent) inset; */
 }
