@@ -1,10 +1,38 @@
-const DOUBLE_CLICK_DELAY = 200;
-const SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
-const SEARCH_DEBOUNCE_TIME = 300;
-let dimmedCoverArt = true;
-let savedAccent = 'blue';
-
 let selectedPaths = new Set();
+
+
+class Preferences {
+
+    constructor() {
+        this.DOUBLE_CLICK_DELAY = 200;
+        this.SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS = 3;
+        this.SEARCH_DEBOUNCE_TIME = 300;
+        this.accentThemes = {
+            green: '#1db954',
+            blue: '#007aff',
+            red: '#ff3b30'
+        };
+        this.savedAccent = 'blue';
+        this.showCoverArt = false;
+        this.isNormalized = true;
+        this.dimmedCoverArt = true;
+        this.applyAccentTheme(this.savedAccent);
+    }
+
+    loadPreferences() {
+        // TODO: implement loading of preferences from external file
+    }
+
+    applyAccentTheme(colorName) {
+        const hexValue = this.accentThemes[colorName] || this.accentThemes.blue;
+        document.documentElement.style.setProperty('--accent', hexValue);
+    }
+
+    savePreferences() {
+        // TODO: implement saving of preferences to external file
+    }
+
+}
 
 
 class ApplicationMenu {
@@ -83,7 +111,7 @@ class TrackContextMenu {
         const playNextItem = document.getElementById('ctx-play-next');
         playNextItem.addEventListener('click', () => {
             const pathsArray = Array.from(selectedPaths);
-            myAudioPlayer.manualQueue = pathsArray.concat(myAudioPlayer.manualQueue);
+            audioPlayer.manualQueue = pathsArray.concat(audioPlayer.manualQueue);
             document.getElementById('context-menu').classList.add('hidden');
             if (!queuePopover.classList.contains('hidden')) {
                 renderQueuePopover();
@@ -351,13 +379,14 @@ class SongsViewSettingsModal {
     }
 
     open() {
-        document.getElementById('list-show-coverart').checked = songsView.showCoverArt;
+        document.getElementById('list-show-coverart').checked = preferences.showCoverArt;
         this.container.classList.remove('hidden');
     }
 
     save() {
-        songsView.showCoverArt = document.getElementById('list-show-coverart').checked;
+        preferences.showCoverArt = document.getElementById('list-show-coverart').checked;
         songsView.renderVirtualList(); 
+        preferences.savePreferences();
         this.close();
     }
 
@@ -378,11 +407,6 @@ class SongsViewSettingsModal {
 
 class AppSettingsModal {
     constructor() {
-        this.accentThemes = {
-            green: '#1db954',
-            blue: '#007aff',
-            red: '#ff3b30'
-        };
         this.id = 'app-settings-modal';
         this.container = document.getElementById(this.id);
         this.audio_normalization_checkbox = document.getElementById(
@@ -404,59 +428,56 @@ class AppSettingsModal {
         });
     }
     applyAudioOptions() {
-        if (myAudioPlayer.isNormalized) {
-            myAudioPlayer.audioSource.disconnect(myAudioPlayer.audioCtx.destination);
-            myAudioPlayer.audioSource.connect(myAudioPlayer.compressor);
-            myAudioPlayer.compressor.connect(myAudioPlayer.audioCtx.destination);
+        if (preferences.isNormalized) {
+            audioPlayer.audioSource.disconnect(audioPlayer.audioCtx.destination);
+            audioPlayer.audioSource.connect(audioPlayer.compressor);
+            audioPlayer.compressor.connect(audioPlayer.audioCtx.destination);
         } else {
-            myAudioPlayer.audioSource.disconnect(myAudioPlayer.compressor);
-            myAudioPlayer.compressor.disconnect(myAudioPlayer.audioCtx.destination);
-            myAudioPlayer.audioSource.connect(myAudioPlayer.audioCtx.destination);
+            audioPlayer.audioSource.disconnect(audioPlayer.compressor);
+            audioPlayer.compressor.disconnect(audioPlayer.audioCtx.destination);
+            audioPlayer.audioSource.connect(audioPlayer.audioCtx.destination);
         }
     }
     applyVisualOptions() {
         //.album-card-cover
         const expandedCover = document.getElementById('expanded-highres-cover');
         if (expandedCover) {
-            if (dimmedCoverArt) {
+            if (preferences.dimmedCoverArt) {
                 expandedCover.classList.add('dimmed');
             } else {
                 expandedCover.classList.remove('dimmed');
             }
         }
         document.querySelectorAll('.album-card-cover').forEach(c => {
-            if (dimmedCoverArt) {
+            if (preferences.dimmedCoverArt) {
                 c.classList.add('dimmed');
             } else {
                 c.classList.remove('dimmed');
             }
         });
     }
-    applyAccentTheme(colorName) {
-        const hexValue = this.accentThemes[colorName] || this.accentThemes.green;
-        document.documentElement.style.setProperty('--accent', hexValue);
-    }
     show() {
         this.container.classList.remove('hidden');
-        this.audio_normalization_checkbox.checked = myAudioPlayer.isNormalized;
-        this.dimmed_coverart_checkbox.checked = dimmedCoverArt;
+        this.audio_normalization_checkbox.checked = preferences.isNormalized;
+        this.dimmed_coverart_checkbox.checked = preferences.dimmedCoverArt;
         if (this.selectDropdown) {
-            this.selectDropdown.value = savedAccent;
+            this.selectDropdown.value = preferences.savedAccent;
         }
 
     }
     save() {
-        myAudioPlayer.initWebAudio();
-        if (myAudioPlayer.isNormalized != this.audio_normalization_checkbox.checked) {
-            myAudioPlayer.isNormalized = this.audio_normalization_checkbox.checked;
+        audioPlayer.initWebAudio();
+        if (preferences.isNormalized != this.audio_normalization_checkbox.checked) {
+            preferences.isNormalized = this.audio_normalization_checkbox.checked;
             this.applyAudioOptions();
         }
-        if (dimmedCoverArt != this.dimmed_coverart_checkbox.checked) {
-            dimmedCoverArt = this.dimmed_coverart_checkbox.checked;
+        if (preferences.dimmedCoverArt != this.dimmed_coverart_checkbox.checked) {
+            preferences.dimmedCoverArt = this.dimmed_coverart_checkbox.checked;
             this.applyVisualOptions();
         }
-        savedAccent = this.selectDropdown.value;
-        this.applyAccentTheme(savedAccent);
+        preferences.savedAccent = this.selectDropdown.value;
+        preferences.applyAccentTheme(preferences.savedAccent);
+        preferences.savePreferences();
     }
     hide() {
         this.container.classList.add('hidden');
@@ -651,8 +672,8 @@ class GuiController {
                 } else {
                     albumsView.renderAlbumGrid(); 
                 }
-                myAudioPlayer.refreshDynamicQueue();
-            }, SEARCH_DEBOUNCE_TIME); 
+                audioPlayer.refreshDynamicQueue();
+            }, preferences.SEARCH_DEBOUNCE_TIME); 
         });
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
@@ -682,17 +703,17 @@ class GuiController {
     initPlayPauseBtn() {
         gui.playPauseBtnPlayingIcon.style.display = 'none';
         gui.playPauseBtn.addEventListener('click', () => {
-            if (!myAudioPlayer.htmlAudioElement.src) return;
-            if (myAudioPlayer.isPlaying) {
-                myAudioPlayer.htmlAudioElement.pause();
+            if (!audioPlayer.htmlAudioElement.src) return;
+            if (audioPlayer.isPlaying) {
+                audioPlayer.htmlAudioElement.pause();
                 gui.playPauseBtnPlayingIcon.style.display = 'none';
                 gui.playPauseBtnPausedIcon.style.display = 'block';
             } else {
-                myAudioPlayer.htmlAudioElement.play();
+                audioPlayer.htmlAudioElement.play();
                 gui.playPauseBtnPausedIcon.style.display = 'none';
                 gui.playPauseBtnPlayingIcon.style.display = 'block';
             }
-            myAudioPlayer.isPlaying = !myAudioPlayer.isPlaying;
+            audioPlayer.isPlaying = !audioPlayer.isPlaying;
         });
         document.addEventListener('keydown', e => {
             if (e.code === 'Space') {
@@ -709,9 +730,9 @@ class GuiController {
 
     initShuffleBtn() {
         gui.shuffleBtn.addEventListener('click', (e) => {
-            myAudioPlayer.isShuffle = !myAudioPlayer.isShuffle;
+            audioPlayer.isShuffle = !audioPlayer.isShuffle;
             // e.target.classList.toggle('active', myAudioPlayer.isShuffle);
-            if (myAudioPlayer.isShuffle) {
+            if (audioPlayer.isShuffle) {
                 document.getElementById('shuffle-btn').innerHTML =
                 '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                 '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm480-120h160q17 0 28.5-11.5T800-200v-160q0-17-11.5-28.5T760-400q-17 0-28.5 11.5T720-360v62l-97-97q-12-12-28.5-12T566-395q-12 12-12.5 28t11.5 28l99 99h-64q-17 0-28.5 11.5T560-200q0 17 11.5 28.5T600-160Zm-428-12q11 11 28 11t28-11l492-492v64q0 17 11.5 28.5T760-560q17 0 28.5-11.5T800-600v-160q0-17-11.5-28.5T760-800H600q-17 0-28.5 11.5T560-760q0 17 11.5 28.5T600-720h64L172-228q-11 11-11 28t11 28Zm-1-560 168 167q11 11 28 11t28-11q12-12 11.5-28.5T395-621L227-788q-12-11-28.5-11T171-788q-11 11-11 28t11 28Z"/>' +
@@ -724,8 +745,8 @@ class GuiController {
                 '</svg>'
                 ;
             }
-            if (myAudioPlayer.currentPlayingPath) {
-                myAudioPlayer.buildContextQueue(myAudioPlayer.currentPlayingPath);
+            if (audioPlayer.currentPlayingPath) {
+                audioPlayer.buildContextQueue(audioPlayer.currentPlayingPath);
             }
             if (queuePopover.container && !queuePopover.container.classList.contains('hidden')) {
                 queuePopover.render();
@@ -735,19 +756,19 @@ class GuiController {
 
     initRepeatBtn() {
         gui.repeatBtn.addEventListener('click', () => {
-            console.log('repeat was ' + myAudioPlayer.repeatMode);
-            if (myAudioPlayer.repeatMode === 'off') {
-                myAudioPlayer.repeatMode = 'all';
-                console.log('repeat is now ' + myAudioPlayer.repeatMode);
+            console.log('repeat was ' + audioPlayer.repeatMode);
+            if (audioPlayer.repeatMode === 'off') {
+                audioPlayer.repeatMode = 'all';
+                console.log('repeat is now ' + audioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406Z"/>' +
                     '</svg>'
                 ;
                 gui.repeatBtn.title = 'Repeat: All';
-            } else if (myAudioPlayer.repeatMode === 'all') {
-                myAudioPlayer.repeatMode = 'one';
-                console.log('repeat is now ' + myAudioPlayer.repeatMode);
+            } else if (audioPlayer.repeatMode === 'all') {
+                audioPlayer.repeatMode = 'one';
+                console.log('repeat is now ' + audioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="M120-40q-33 0-56.5-23.5T40-120v-720q0-33 23.5-56.5T120-920h720q33 0 56.5 23.5T920-840v720q0 33-23.5 56.5T840-40H120Zm154-160h406q33 0 56.5-23.5T760-280v-120q0-17-11.5-28.5T720-440q-17 0-28.5 11.5T680-400v120H274l34-34q12-12 11.5-28T308-370q-12-12-28.5-12.5T251-371L148-268q-6 6-8.5 13t-2.5 15q0 8 2.5 15t8.5 13l103 103q12 12 28.5 11.5T308-110q11-12 11.5-28T308-166l-34-34Zm412-480-34 34q-12 12-11.5 28t11.5 28q12 12 28.5 12.5T709-589l103-103q6-6 8.5-13t2.5-15q0-8-2.5-15t-8.5-13L709-851q-12-12-28.5-11.5T652-850q-11 12-11.5 28t11.5 28l34 34H280q-33 0-56.5 23.5T200-680v120q0 17 11.5 28.5T240-520q17 0 28.5-11.5T280-560v-120h406ZM460-540v150q0 13 8.5 21.5T490-360q13 0 21.5-8.5T520-390v-170q0-17-11.5-28.5T480-600h-50q-13 0-21.5 8.5T400-570q0 13 8.5 21.5T430-540h30Z"/>' +
@@ -755,8 +776,8 @@ class GuiController {
                 ;
                 gui.repeatBtn.title = 'Repeat: One';
             } else {
-                myAudioPlayer.repeatMode = 'off';
-                console.log('repeat is now ' + myAudioPlayer.repeatMode);
+                audioPlayer.repeatMode = 'off';
+                console.log('repeat is now ' + audioPlayer.repeatMode);
                 gui.repeatBtn.innerHTML = 
                     '<svg class="btn-icon" viewBox="0 -960 960 960">' +
                     '<path d="m274-200 34 34q12 12 11.5 28T308-110q-12 12-28.5 12.5T251-109L148-212q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l103-103q12-12 28.5-11.5T308-370q11 12 11.5 28T308-314l-34 34h406v-120q0-17 11.5-28.5T720-440q17 0 28.5 11.5T760-400v120q0 33-23.5 56.5T680-200H274Zm412-480H280v120q0 17-11.5 28.5T240-520q-17 0-28.5-11.5T200-560v-120q0-33 23.5-56.5T280-760h406l-34-34q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T709-851l103 103q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L709-589q-12 12-28.5 11.5T652-590q-11-12-11.5-28t11.5-28l34-34Z"/>' +
@@ -785,23 +806,23 @@ class GuiController {
 
     initNextBtn() {
         gui.nextBtn.addEventListener('click', async () => {
-            const targetPath = myAudioPlayer.popNextTrackFromQueue();
-            if (targetPath) await myAudioPlayer.requestPlayback(targetPath, 1, false);
+            const targetPath = audioPlayer.popNextTrackFromQueue();
+            if (targetPath) await audioPlayer.requestPlayback(targetPath, 1, false);
         });
     }
 
     initPrevBtn() {
         gui.prevBtn.addEventListener('click', async () => {
-            if (!myAudioPlayer.currentPlayingPath) return;
-            if (myAudioPlayer.htmlAudioElement.currentTime > SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
-                myAudioPlayer.htmlAudioElement.currentTime = 0;
-                gui.progressBar.value = myAudioPlayer.htmlAudioElement.currentTime;
+            if (!audioPlayer.currentPlayingPath) return;
+            if (audioPlayer.htmlAudioElement.currentTime > preferences.SKIP_TO_PREVIOUS_TRACK_THRESHOLD_SECONDS) {
+                audioPlayer.htmlAudioElement.currentTime = 0;
+                gui.progressBar.value = audioPlayer.htmlAudioElement.currentTime;
             } else {
-                const targetPath = myAudioPlayer.getPreviousTrackPath(myAudioPlayer.currentPlayingPath);
+                const targetPath = audioPlayer.getPreviousTrackPath(audioPlayer.currentPlayingPath);
                 if (targetPath) {
-                    myAudioPlayer.manualQueue = [];
-                    myAudioPlayer.buildContextQueue(targetPath);
-                    await myAudioPlayer.requestPlayback(targetPath, -1, false);
+                    audioPlayer.manualQueue = [];
+                    audioPlayer.buildContextQueue(targetPath);
+                    await audioPlayer.requestPlayback(targetPath, -1, false);
                 }
             }
         });
@@ -816,16 +837,16 @@ class GuiController {
             gui.currentTimeEl.innerText = Utils.formatTime(gui.progressBar.value);
         });
         gui.progressBar.addEventListener('change', (e) => {
-            myAudioPlayer.htmlAudioElement.currentTime = gui.progressBar.value;
+            audioPlayer.htmlAudioElement.currentTime = gui.progressBar.value;
             this.isUserDraggingProgressHandle = false;
         });
-        myAudioPlayer.htmlAudioElement.addEventListener('timeupdate', () => {
+        audioPlayer.htmlAudioElement.addEventListener('timeupdate', () => {
             if (this.isUserDraggingProgressHandle) return; 
-            gui.currentTimeEl.innerText = Utils.formatTime(myAudioPlayer.htmlAudioElement.currentTime);
-            if (myAudioPlayer.htmlAudioElement.duration) {
-                gui.totalTimeEl.innerText = Utils.formatTime(myAudioPlayer.htmlAudioElement.duration);
-                gui.progressBar.max = myAudioPlayer.htmlAudioElement.duration;
-                gui.progressBar.value = myAudioPlayer.htmlAudioElement.currentTime;
+            gui.currentTimeEl.innerText = Utils.formatTime(audioPlayer.htmlAudioElement.currentTime);
+            if (audioPlayer.htmlAudioElement.duration) {
+                gui.totalTimeEl.innerText = Utils.formatTime(audioPlayer.htmlAudioElement.duration);
+                gui.progressBar.max = audioPlayer.htmlAudioElement.duration;
+                gui.progressBar.value = audioPlayer.htmlAudioElement.currentTime;
             }
         });
     }
@@ -842,12 +863,12 @@ class GuiController {
         if (gui.volumeBtn) {
             this.setVolumeIcon();
             gui.volumeBtn.addEventListener('click', () =>  {
-                myAudioPlayer.htmlAudioElement.muted = !myAudioPlayer.htmlAudioElement.muted;
-                if (myAudioPlayer.htmlAudioElement.muted) {
+                audioPlayer.htmlAudioElement.muted = !audioPlayer.htmlAudioElement.muted;
+                if (audioPlayer.htmlAudioElement.muted) {
                     gui.volumeBar.value = gui.volumeBar.min;
                 } else {
                     gui.volumeBar.value = GuiHelper.volumeToSlider(
-                        myAudioPlayer.getVolumeLevel());
+                        audioPlayer.getVolumeLevel());
                 }
                 this.setVolumeIcon();
             });
@@ -857,21 +878,21 @@ class GuiController {
     initVolumebar() {
         if (gui.volumeBar) {
             gui.volumeBar.min = 0;
-            gui.volumeBar.max = myAudioPlayer.getVolumeMax();
+            gui.volumeBar.max = audioPlayer.getVolumeMax();
             gui.volumeBar.step = gui.volumeBar.max / 100;
-            gui.volumeBar.value = myAudioPlayer.getVolumeLevel();
+            gui.volumeBar.value = audioPlayer.getVolumeLevel();
             gui.volumeBar.addEventListener('input', () => {
-                if (myAudioPlayer.htmlAudioElement.muted) myAudioPlayer.htmlAudioElement.muted = false;
-                myAudioPlayer.setVolumeLevel(
+                if (audioPlayer.htmlAudioElement.muted) audioPlayer.htmlAudioElement.muted = false;
+                audioPlayer.setVolumeLevel(
                     GuiHelper.sliderToVolume(gui.volumeBar.value));
-                myAudioPlayer.htmlAudioElement.volume = myAudioPlayer.getVolumeLevel();
+                audioPlayer.htmlAudioElement.volume = audioPlayer.getVolumeLevel();
                 this.setVolumeIcon();
             });
         }
     }
 
     setVolumeIcon() {
-        if (myAudioPlayer.htmlAudioElement.muted) {
+        if (audioPlayer.htmlAudioElement.muted) {
             this.speakerIcon.style.display = 'none';
             this.mutedIcon.style.display = 'initial';
         } else {
@@ -901,13 +922,13 @@ class GuiHelper {
         return isModalOpen;
     }
     static sliderToVolume(val) {
-        const minGain = myAudioPlayer.getVolumeMin();
-        const maxGain = myAudioPlayer.getVolumeMax();
+        const minGain = audioPlayer.getVolumeMin();
+        const maxGain = audioPlayer.getVolumeMax();
         return Math.exp(val * Math.log(maxGain) + (1 - val) * Math.log(minGain));
     }
     static volumeToSlider(val) {
-        const minGain = myAudioPlayer.getVolumeMin();
-        const maxGain = myAudioPlayer.getVolumeMax();
+        const minGain = audioPlayer.getVolumeMin();
+        const maxGain = audioPlayer.getVolumeMax();
         const x = (Math.log(val) - Math.log(minGain)) / (Math.log(maxGain) - Math.log(minGain));
         const normalized = Math.max(0, Math.min(1, x));
         return normalized;
@@ -930,13 +951,12 @@ class SongsView {
         this.LIST_VIEW_ROW_BUFFER = 20;
         this.lastClickedIndex = null;
         this.currentSort = { field: null, ascending: true };
-        this.showCoverArt = true;
         this.addEventListeners();
     }
 
     renderVirtualList() {
         const wrapper = document.getElementById('list-view-wrapper');
-        if (this.showCoverArt) {
+        if (preferences.showCoverArt) {
             wrapper.classList.remove('hide-covers');
             this.LIST_VIEW_ROW_HEIGHT = 52; // Standard height
         } else {
@@ -973,9 +993,9 @@ class SongsView {
         const li = document.createElement('li');
         const isSelected = selectedPaths.has(track.file_path) ? ' track-selected' : '';
         const isMissing = track.missing ? ' track-missing' : '';
-        const isPlaying = (myAudioPlayer.currentPlayingPath && track.file_path === myAudioPlayer.currentPlayingPath) ? ' track-playing' : '';
+        const isPlaying = (audioPlayer.currentPlayingPath && track.file_path === audioPlayer.currentPlayingPath) ? ' track-playing' : '';
         const missingWarning = track.missing ? '<span class="missing-icon" title="File not found">⚠️</span>' : '';      
-        const coverArtHTML = this.showCoverArt 
+        const coverArtHTML = preferences.showCoverArt 
             ? `<img class="track-cover" id="cover-${i}" src="${GuiHelper.getCoverUrl(track.cover_hash)}" alt="">` 
             : ``;
         
@@ -1012,7 +1032,7 @@ class SongsView {
             return 0;
         });
         this.renderVirtualList();
-        myAudioPlayer.refreshDynamicQueue();
+        audioPlayer.refreshDynamicQueue();
         this.updateSortIndicators();
     }
 
@@ -1058,8 +1078,8 @@ class SongsView {
         const trackIndex = parseInt(row.dataset.index);
         const targetPath = musicLibrary.data[trackIndex].file_path;
         window.getSelection().removeAllRanges();
-        myAudioPlayer.playbackContext = { type: 'list', key: null };    
-        await myAudioPlayer.requestPlayback(targetPath, 1, true);
+        audioPlayer.playbackContext = { type: 'list', key: null };    
+        await audioPlayer.requestPlayback(targetPath, 1, true);
     }
 
     addEventListeners() {
@@ -1074,7 +1094,7 @@ class SongsView {
                 gui.doubleClickOnTrackPossible = true;
                 setTimeout(() => {
                     gui.doubleClickOnTrackPossible = false;
-                }, DOUBLE_CLICK_DELAY);
+                }, preferences.DOUBLE_CLICK_DELAY);
             } else {
                 this.doubleClickOnTrack(e);
             }
@@ -1281,7 +1301,7 @@ class AlbumsView {
                 trackListHTML += `<li class="disc-header">Disc ${trackDisc}</li>`;
                 currentDisc = trackDisc;
             }
-            const isPlaying = (myAudioPlayer.currentPlayingPath && t.file_path === myAudioPlayer.currentPlayingPath) ? ' track-playing' : '';
+            const isPlaying = (audioPlayer.currentPlayingPath && t.file_path === audioPlayer.currentPlayingPath) ? ' track-playing' : '';
             const isSelected = selectedPaths.has(t.file_path) ? ' track-selected' : '';
             const missingWarning = t.missing ? '⚠️ ' : '';
             trackListHTML += `
@@ -1368,15 +1388,15 @@ class AlbumsView {
                 gui.doubleClickOnTrackPossible = true;
                 setTimeout(
                     () => { gui.doubleClickOnTrackPossible = false; },
-                    DOUBLE_CLICK_DELAY
+                    preferences.DOUBLE_CLICK_DELAY
                 );
             } else {
                 window.getSelection().removeAllRanges(); 
-                myAudioPlayer.playbackContext = { type: 'album', key: albumData.key };
+                audioPlayer.playbackContext = { type: 'album', key: albumData.key };
                 musicLibrary.staticAlbumPool = albumData.tracks.map(
                     t => t.file_path
                 );
-                myAudioPlayer.requestPlayback(li.dataset.filepath, 1, true);
+                audioPlayer.requestPlayback(li.dataset.filepath, 1, true);
             }    
         });
         expandedList.addEventListener('contextmenu', (e) => {
@@ -1499,7 +1519,7 @@ class MusicLibrary {
     }
 
     getPoolOfAllowedTracks() {
-        if (myAudioPlayer.playbackContext.type === 'album') {
+        if (audioPlayer.playbackContext.type === 'album') {
             return this.staticAlbumPool;
         } else {
             return this.libraryData.map(t => t.file_path);
@@ -1643,15 +1663,15 @@ class QueuePopover {
         const clearQueueBtn = document.getElementById('clear-queue-btn');
         clearQueueBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            myAudioPlayer.manualQueue = [];
-            myAudioPlayer.contextQueue = [];
+            audioPlayer.manualQueue = [];
+            audioPlayer.contextQueue = [];
             this.render();
         });
     }
 
     render() {
         this.queueList.innerHTML = '';   
-        const combinedQueue = myAudioPlayer.manualQueue.concat(myAudioPlayer.contextQueue); 
+        const combinedQueue = audioPlayer.manualQueue.concat(audioPlayer.contextQueue); 
         this.visuallyCombineQueues(combinedQueue);
         this.initRemovalButtons();
         this.updateFooterText(combinedQueue);
@@ -1667,9 +1687,9 @@ class QueuePopover {
             const track = musicLibrary.masterData.find(t => t.file_path === trackPath);
             if (!track) return;
             const li = document.createElement('li');
-            const isManual = visualIndex < myAudioPlayer.manualQueue.length;
+            const isManual = visualIndex < audioPlayer.manualQueue.length;
             const sourceArray = isManual ? 'manual' : 'context';
-            const sourceIndex = isManual ? visualIndex : visualIndex - myAudioPlayer.manualQueue.length;
+            const sourceIndex = isManual ? visualIndex : visualIndex - audioPlayer.manualQueue.length;
             li.innerHTML = `
                 <img src="${GuiHelper.getCoverUrl(track.cover_hash)}" style="width: 35px; height: 35px; border-radius: 4px; object-fit: cover;">
                 <div class="queue-item-info">
@@ -1703,9 +1723,9 @@ class QueuePopover {
                 const src = btn.dataset.source;
                 const idx = parseInt(btn.dataset.index);
                 if (src === 'manual') {
-                    myAudioPlayer.manualQueue.splice(idx, 1);
+                    audioPlayer.manualQueue.splice(idx, 1);
                 } else {
-                    myAudioPlayer.contextQueue.splice(idx, 1);
+                    audioPlayer.contextQueue.splice(idx, 1);
                 }
                 this.render();
             });
@@ -1715,7 +1735,7 @@ class QueuePopover {
 }
 
 
-class MyAudioPlayer {
+class AudioPlayer {
 
     constructor () {
         this.htmlAudioElement;
@@ -1725,7 +1745,6 @@ class MyAudioPlayer {
         this.volumeMin = 0.01
         this.volumeMax = 1;
         this.volumeLevel = this.volumeMax;
-        this.isNormalized = true;
         this.isPlaying = false;
 
         this.isShuffle = false;
@@ -1778,7 +1797,7 @@ class MyAudioPlayer {
             attack: 0,
             release: 0.25,
         });
-        if (this.isNormalized) {
+        if (preferences.isNormalized) {
             this.audioSource.connect(this.compressor);
             this.compressor.connect(this.audioCtx.destination);
         } else {
@@ -1801,7 +1820,7 @@ class MyAudioPlayer {
                         const newPath = response.new_path;
                         const replacePath = (arr) => arr.map(p => p === targetPath ? newPath : p);
                         this.manualQueue = replacePath(this.manualQueue);
-                        myAudioPlayer.contextQueue = replacePath(myAudioPlayer.contextQueue);
+                        audioPlayer.contextQueue = replacePath(audioPlayer.contextQueue);
                         musicLibrary.staticAlbumPool = replacePath(musicLibrary.staticAlbumPool);
                         track.file_path = newPath;
                         track.missing = false;
@@ -1928,7 +1947,8 @@ class MyAudioPlayer {
 
 const gui = new Gui();
 const guiController = new GuiController();
-const myAudioPlayer = new MyAudioPlayer();
+const preferences = new Preferences();
+const audioPlayer = new AudioPlayer();
 const musicLibrary = new MusicLibrary();
 const songsView = new SongsView();
 const albumsView = new AlbumsView();

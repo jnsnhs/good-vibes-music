@@ -1,3 +1,4 @@
+import configparser
 import hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import music_tag
@@ -9,6 +10,7 @@ from tinytag import TinyTag
 import urllib.parse
 import webview
 
+CONFIG_FILE = "config.ini"
 LIBRARY_FILE = "library.db"
 IMG_BROWSER_CACHE_DAYS = 30
 
@@ -356,6 +358,25 @@ class Api:
         conn.close()
         return {"status": status}
 
+    def get_preferences(self) -> dict:
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+        if "Preferences" not in config:
+            return {}
+        else:
+            return dict(config["Preferences"])
+
+    def save_preferences(self, key: str, value: str) -> None:
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+        if "Preferences" not in config:
+            config["Preferences"] = {}
+        else:
+            config["Preferences"][key] = str(value)
+            print(config["Preferences"][key])
+        with open(CONFIG_FILE, "w") as configfile:
+            config.write(configfile)
+
     def check_file_exists(self, file_path: str) -> bool:
         return os.path.exists(file_path)
 
@@ -363,14 +384,7 @@ class Api:
         window.destroy()
 
 
-def start_audio_server():
-    """Runs the server on a dedicated background thread."""
-    server = HTTPServer(('127.0.0.1', 65432), AudioStreamHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-
-def init_db():
+def init_db() -> None:
     os.makedirs('art_cache', exist_ok=True)
     conn = sqlite3.connect(LIBRARY_FILE)
     c = conn.cursor()
@@ -396,8 +410,29 @@ def init_db():
     conn.close()
 
 
+def init_config() -> None:
+    config = configparser.ConfigParser()
+    if not os.path.exists(CONFIG_FILE):
+        config["Preferences"] = {
+            "accent_color": "blue",
+            "show_cover_art": "True",
+            "volume_normalization": "True",
+            "dimmed_cover_art": "True"
+        }
+        with open(CONFIG_FILE, "w") as configFile:
+            config.write(configFile)
+
+
+def start_audio_server() -> None:
+    """Runs the server on a dedicated background thread."""
+    server = HTTPServer(('127.0.0.1', 65432), AudioStreamHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+
 if __name__ == '__main__':
     init_db()
+    init_config()
     start_audio_server()
     window = webview.create_window(
         title='Good Vibes',
