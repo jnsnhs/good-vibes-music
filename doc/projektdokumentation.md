@@ -6,15 +6,21 @@ Der Konsum digitaler Musik hat sich in den letzten 15 Jahren immer mehr in Richt
 
 Zwar können diese Produkte durchaus dazu genutzt werden, um auch lokale Musikdateien abzuspielen, doch sind sie für diesen use case nicht optimiert: Der Streaming-Service – das eigentliche Kernprodukt – ist omnipräsent, auch wenn der User ihn nicht nutzt. Er drängt sich stets als Bloatware auf und schmälert die Usability.
 
+Auch haben gegenwärtige Design-Trends speziell bei Apple Music dazu geführt, dass die Oberfläche weniger benutzerfreundlich ist als noch in früheren iTunes-Versionen. Besonders deutlich wird dies beim Vergleich der Alben-Ansicht zwischen iTunes 12.9 und Apple Music 1.2:
+
+| ![alt text](screenshots/itunes_12_9.png)  | ![alt text](screenshots/music_1_2.png) |
+| --- | --- |
+| **iTunes 12.9**: Ausgehend von einem Alben-Raster klappen sich einzelne Alben mit einem einzigen Klick aus. Der Wechsel zu einem anderne Album geschieht mit nur einem einzigen Klick. Wenn die Fensterbreite es zulässt, werden die Tracks in zwei Spalten dargestellt. Danebn erscheint das Cover in einer deutlich vergrößerten Ansicht. | **Apple Music 1.2**: Zwar ist auch hier ein Alben-Raster der Ausgangspunkt, doch öffnet sich jedes Album in einer neuen Ansicht. Um zum Alben-Raster zurückzukehren, ist immer ein *zusätzlicher* Klick nötig. Die Tracks eines Albums werden nicht kompakt dargestellt, sondern können erst durch Scrollen vollständig sichtbar gemacht weren. |
+
 Die Suche nach geeigneten Alternativen zum Abspielen einer lokalen Musiksammlung ist nicht einfach, denn der Fokus auf Streaming hat den lokalen Desktop-Audioplayer zu einer Nischen-Anwendung werden lassen.
 
 ## Projektplanung
 
-#### Zielsetzung
+### Zielsetzung
 
 Basierend auf dem beschriebenen Ist-Zustand hat dieses Projekt die Entwicklung einer Musik-Library für lokale Dateien zum Ziel. Grob orientiert an iTunes 12 (erschienen 2014) liegt der Fokus auf einer visuell ansprechenden   Darstellung einer großen Anzahl lokaler Musikdateien. Auf diese Weise sollen auch umfangreiche Sammlungen dem User strukturiert präsentiert werden können, ohne dabei jedoch durch ein Übermaß an Verwaltungsfunktionen und Einstellungsmöglichkeiten vom eigentlichen Musikgenuss abzulenken. Ziel ist die Entwicklung einer schnörkellosen, plattformunabhängigen Anwendung.
 
-#### Anforderungen
+### Anforderungen
 
 Die funktionalen Anforderungen, die vom Programm unbedingt erfüllt werden müssen, lauten wie folgt:
 
@@ -40,7 +46,7 @@ Weiterhin sollte das Programm die folgenden Anforderungen erfüllen:
 
 - Der Quelltext der Anwendung soll strukturiert und – sofern möglich – objektorientiert sein, um spätere Änderungen und Wartungen reibnugslos zu ermgölichen.
 
-#### Abgrenzung
+### Abgrenzung
 
 Nicht realisiert werden sollen folgende, bei vergleichbaren Progammen häufig vorzufindende, Funktionalitäten:
 
@@ -52,7 +58,7 @@ Nicht realisiert werden sollen folgende, bei vergleichbaren Progammen häufig vo
 
 ## Umsetzung
 
-#### Verwendte Technologien
+### Verwendte Technologien
 
 Die Umsetzung der Anwendung erfolgte mit einer Kombination aus Python, SQLite und Standard-Webtechnologien.
 
@@ -64,7 +70,7 @@ Die Umsetzung der Anwendung erfolgte mit einer Kombination aus Python, SQLite un
 
 Ganz bewusst wurden die ersten Schritte dieses Projektes im Pair Programming zusammen mit Google Gemini umgesetzt, um auch diese Spielart der Softwareentwicklung einmal zu erproben und sich damit vertraut zu machen. Als der Quelltext eine Größe erreichte, die vom LLM selbst als „too large for the best results“ bezeichnet wurde, erfolgte weitestgehend der Umstieg auf manuelles Coding.
 
-#### Entwicklungsprozess
+### Entwicklungsprozess
 
 Weil der Beginn des Projekts bewusst ein Versuch im *Vibe Coding* mit Hilfe von Google Gemini (Pro, Extended Thinkin) war, soll der Hergang dieser ersten Schritte kurz erläutert werden. Den Ausgangspunkt markierte ein umfaassender Prompt, der selbst bereits von Gemini überarbeitet worden war:
 
@@ -135,7 +141,7 @@ Gänzlich zum Erliegen kommt die Zusammenarbeit zwischen mit und Gemini, als ich
 An dieser Stelle überweigt meine Skepsis gegenüber dem reinen Vibe-Coding-Ansatz – auch, weil der beträchtlich angewachsene Code ein nur schwer zu durchschauender Flickenteppich aus einer langen Liste von Funktionen geworden ist. Also bringe ich mühsam Ordnung und Struktur in den Quelltext und setze die Entwicklichung anschließend wieder händisch und mit deutlich weniger Input des Kollegen Gemini fort. 
 
 
-#### Aufbau der Lösung
+### Aufbau der Lösung
 
 Die entwickelte Anwendung ist im Kern ein Python-Programm, das über die Datei `app.py` gestartet wird.
 
