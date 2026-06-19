@@ -15,9 +15,9 @@ LIBRARY_FILE = "library.db"
 IMG_BROWSER_CACHE_DAYS = 30
 
 
-class AudioStreamHandler(BaseHTTPRequestHandler):
+class HttpRequestHandler(BaseHTTPRequestHandler):
     """
-    Local Audio Streaming HTTP Server
+    Local HTTP Server für Audio Streaming and Access to Cover Art
     """
 
     def do_GET(self):
@@ -425,7 +425,7 @@ def init_config() -> None:
 
 def start_audio_server() -> None:
     """Runs the server on a dedicated background thread."""
-    server = HTTPServer(('127.0.0.1', 65432), AudioStreamHandler)
+    server = HTTPServer(('127.0.0.1', 65432), HttpRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
